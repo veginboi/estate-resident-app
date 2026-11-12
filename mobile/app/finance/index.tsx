@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { useState, type ComponentProps } from "react";
 import { View } from "react-native";
 import { BankCard, ReceiptUploadSheet, formatDate, naira } from "@/components/payments";
+import { useReceiptViewer } from "@/components/ReceiptViewer";
 import { colors } from "@/components/theme";
 import { Button, Card, Chip, EmptyState, ErrorState, LoadingState, Screen, SuccessNote, Txt } from "@/components/ui";
 import { api, isMockMode } from "@/lib/api";
@@ -52,7 +53,17 @@ function Stat({ icon, value, label, danger }: { icon: ComponentProps<typeof Feat
   );
 }
 
-function BillCard({ bill, onUpload }: { bill: Bill; onUpload: (b: Bill) => void }) {
+function BillCard({
+  bill,
+  onUpload,
+  onViewReceipt,
+  opening,
+}: {
+  bill: Bill;
+  onUpload: (b: Bill) => void;
+  onViewReceipt: (b: Bill) => void;
+  opening: boolean;
+}) {
   const rejected = bill.receipt?.status === "rejected" && bill.status !== "paid";
   return (
     <View style={{ paddingVertical: 14, gap: 6, borderBottomWidth: 1, borderColor: colors.row }}>
@@ -83,9 +94,18 @@ function BillCard({ bill, onUpload }: { bill: Bill; onUpload: (b: Bill) => void 
           </Txt>
         </View>
       )}
-      {bill.canUploadReceipt && (
-        <View style={{ alignItems: "flex-start", marginTop: 4 }}>
-          <Button title="Upload receipt" icon="upload" onPress={() => onUpload(bill)} />
+      {(bill.canUploadReceipt || (bill.receipt && bill.status !== "paid")) && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+          {bill.canUploadReceipt && <Button title="Upload receipt" icon="upload" onPress={() => onUpload(bill)} />}
+          {bill.receipt && bill.status !== "paid" && (
+            <Button
+              title={opening ? "Opening…" : bill.status === "pending" ? "View receipt" : "View last receipt"}
+              icon="file-text"
+              variant="outline"
+              onPress={() => onViewReceipt(bill)}
+              disabled={opening}
+            />
+          )}
         </View>
       )}
     </View>
@@ -116,6 +136,7 @@ export default function FinanceScreen() {
   const [tab, setTab] = useState<"bills" | "history">("bills");
   const [uploading, setUploading] = useState<Bill | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const receipts = useReceiptViewer();
 
   const refresh = () => {
     summary.refresh();
@@ -149,6 +170,7 @@ export default function FinanceScreen() {
       )}
 
       {notice && <SuccessNote>{notice}</SuccessNote>}
+      {receipts.error && <ErrorState message={receipts.error} />}
 
       <Card style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }} accessibilityRole="tablist">
@@ -169,7 +191,13 @@ export default function FinanceScreen() {
               {openBills.length === 0 ? (
                 <EmptyState>You&apos;re all paid up. 🎉</EmptyState>
               ) : (
-                openBills.map((b) => <BillCard key={b.id} bill={b} onUpload={setUploading} />)
+                openBills.map((b) => <BillCard
+                    key={b.id}
+                    bill={b}
+                    onUpload={setUploading}
+                    onViewReceipt={(x) => x.receipt && receipts.open(x.receipt)}
+                    opening={receipts.openingId === b.receipt?.id}
+                  />)
               )}
               {paidBills.length > 0 && (
                 <>
@@ -177,7 +205,13 @@ export default function FinanceScreen() {
                     PAID
                   </Txt>
                   {paidBills.map((b) => (
-                    <BillCard key={b.id} bill={b} onUpload={setUploading} />
+                    <BillCard
+                    key={b.id}
+                    bill={b}
+                    onUpload={setUploading}
+                    onViewReceipt={(x) => x.receipt && receipts.open(x.receipt)}
+                    opening={receipts.openingId === b.receipt?.id}
+                  />
                   ))}
                 </>
               )}
@@ -197,6 +231,8 @@ export default function FinanceScreen() {
       {isMockMode && (
         <Txt style={{ color: colors.muted, fontSize: 12, textAlign: "center" }}>Demo mode: receipts you upload aren&apos;t saved.</Txt>
       )}
+
+      {receipts.viewer}
 
       <ReceiptUploadSheet
         target={uploading && { key: `bill-${uploading.id}`, title: uploading.title, amount: uploading.amount }}

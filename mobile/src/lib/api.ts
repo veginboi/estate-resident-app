@@ -1,3 +1,4 @@
+import { File, Paths } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import * as mock from "./mock-data";
@@ -489,6 +490,35 @@ export const api = {
     API_URL
       ? request(`/resident/store/orders/${id}/receipts`, { method: "POST", body: receiptForm(data) })
       : delay(mockStore.upload(id, data)),
+
+  /**
+   * Downloads a receipt the resident uploaded and returns where it was saved on the phone.
+   * Uses the resident's token, because receipts aren't public.
+   */
+  downloadReceipt: async (receiptId: number, fileName: string): Promise<{ uri: string; mimeType: string }> => {
+    if (!API_URL) throw new Error("Receipts can only be opened when the app is connected to the estate server.");
+    const token = (await tokenStore.get()) ?? "";
+    const url = `${API_URL}/resident/receipts/${receiptId}/file`;
+    const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+    const mimeType = ext === "pdf" ? "application/pdf" : ext === "png" ? "image/png" : "image/jpeg";
+
+    if (Platform.OS === "web") {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("Couldn't open the receipt. Please try again.");
+      return { uri: URL.createObjectURL(await res.blob()), mimeType };
+    }
+
+    try {
+      const safeName = fileName.replace(/[^\w.-]+/g, "_") || "receipt";
+      const file = await File.downloadFileAsync(url, new File(Paths.cache, `receipt-${receiptId}-${safeName}`), {
+        headers: { Authorization: `Bearer ${token}` },
+        idempotent: true,
+      });
+      return { uri: file.uri, mimeType };
+    } catch {
+      throw new Error("Couldn't download the receipt. Check your internet connection and try again.");
+    }
+  },
 
   // Estate map
   getEstateMap: (): Promise<EstateMap> => (API_URL ? request("/estate/map") : delay(mock.estateMap)),

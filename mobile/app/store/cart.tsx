@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { naira } from "@/components/payments";
 import { Stepper } from "@/components/store";
@@ -20,16 +20,25 @@ export default function CartScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refresh prices and availability for what's in the cart.
+  const { syncProducts } = cart;
+  useEffect(() => {
+    api
+      .getProducts()
+      .then((r) => syncProducts(r.products))
+      .catch(() => undefined);
+  }, [syncProducts]);
+
   const place = async () => {
     setBusy(true);
     setError(null);
     try {
       const order = await api.placeOrder({
-        items: cart.items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
+        items: cart.orderable.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
         deliveryMethod: DELIVERY[delivery],
         note,
       });
-      cart.clear();
+      cart.removeOrdered(order.items.flatMap((i) => (i.productId === null ? [] : [i.productId])));
       router.replace({ pathname: "/store/orders", params: { placed: String(order.id) } });
     } catch (e) {
       setError((e as Error).message);
@@ -48,17 +57,21 @@ export default function CartScreen() {
       ) : (
         <>
           <Card style={{ paddingHorizontal: 16 }}>
-            {cart.items.map(({ product, quantity }, i) => (
+            {cart.items.map(({ product, quantity, available }, i) => (
               <View
                 key={product.id}
                 style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderColor: colors.row }}
               >
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, opacity: available ? 1 : 0.6 }}>
                   <Txt weight="medium">{product.name}</Txt>
-                  <Txt style={{ fontSize: 12, color: colors.muted }}>{naira(product.price)} each</Txt>
+                  {available ? (
+                    <Txt style={{ fontSize: 12, color: colors.muted }}>{naira(product.price)} each</Txt>
+                  ) : (
+                    <Txt style={{ fontSize: 12, color: colors.danger }}>No longer available. It won&apos;t be ordered.</Txt>
+                  )}
                 </View>
-                <Stepper value={quantity} max={product.maxQuantity} onChange={(n) => cart.setQuantity(product, n)} label={product.name} />
-                <Pressable onPress={() => cart.setQuantity(product, 0)} accessibilityRole="button" accessibilityLabel={`Remove ${product.name}`} hitSlop={8}>
+                {available && <Stepper value={quantity} max={product.maxQuantity} onChange={(n) => cart.setQuantity(product, n)} label={product.name} />}
+                <Pressable onPress={() => cart.remove(product.id)} accessibilityRole="button" accessibilityLabel={`Remove ${product.name}`} hitSlop={8}>
                   <Feather name="trash-2" size={18} color={colors.muted} />
                 </Pressable>
               </View>
@@ -75,7 +88,7 @@ export default function CartScreen() {
               </Txt>
             </View>
             {error && <ErrorState message={error} />}
-            <Button title={busy ? "Placing order…" : "Place order"} onPress={place} disabled={busy} />
+            <Button title={busy ? "Placing order…" : "Place order"} onPress={place} disabled={busy || cart.orderable.length === 0} />
             <Txt style={{ fontSize: 12, color: colors.muted }}>After placing the order, pay by bank transfer and upload your receipt.</Txt>
           </Card>
         </>

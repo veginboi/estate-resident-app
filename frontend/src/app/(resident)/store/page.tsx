@@ -8,7 +8,9 @@ import { api, isMockMode } from "@/lib/api";
 import type { CartLine, Order, OrderStatus, Product } from "@/lib/types";
 import { useData } from "@/lib/use-data";
 
-const CART_KEY = "le_cart";
+// Saved in the browser for each resident; it only changes when the resident changes it.
+type SavedLine = CartLine & { name: string; price: number };
+const cartKey = (residentId: number) => `le_cart:${residentId}`;
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = { "Access & Security": KeyRound, Home, Merchandise: Shirt, Vehicles: Car };
 
@@ -21,22 +23,28 @@ const STATUS: Record<OrderStatus, { label: string; className: string; help: stri
   cancelled: { label: "Cancelled", className: "bg-row text-muted", help: "" },
 };
 
-function readCart(): CartLine[] {
+function readCart(residentId: number): SavedLine[] {
   try {
-    const saved = JSON.parse(localStorage.getItem(CART_KEY) ?? "[]");
-    return Array.isArray(saved) ? saved.filter((l) => Number.isInteger(l?.productId) && Number.isInteger(l?.quantity) && l.quantity > 0) : [];
+    const saved = JSON.parse(localStorage.getItem(cartKey(residentId)) ?? "[]");
+    return Array.isArray(saved)
+      ? saved
+          .filter((l) => Number.isInteger(l?.productId) && Number.isInteger(l?.quantity) && l.quantity > 0)
+          .map((l) => ({ productId: l.productId, quantity: l.quantity, name: String(l.name ?? "Item"), price: Number(l.price) || 0 }))
+      : [];
   } catch {
     return [];
   }
 }
 
-function saveCart(cart: CartLine[]) {
+function saveCart(residentId: number, cart: SavedLine[]) {
   try {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    localStorage.setItem(cartKey(residentId), JSON.stringify(cart));
   } catch {
     /* storage unavailable; the cart still works until the page is reloaded */
   }
 }
+
+type CartRow = { productId: number; name: string; price: number; quantity: number; product: Product | null; available: boolean };
 
 function Stepper({ value, max, onChange, label }: { value: number; max: number | null; onChange: (n: number) => void; label: string }) {
   return (
@@ -101,24 +109,27 @@ function ProductCard({ product, quantity, onSetQuantity }: { product: Product; q
 function CartPanel({
   lines,
   onSetQuantity,
+  onRemove,
   onPlaced,
 }: {
-  lines: { product: Product; quantity: number }[];
-  onSetQuantity: (productId: number, n: number) => void;
+  lines: CartRow[];
+  onSetQuantity: (product: Product, n: number) => void;
+  onRemove: (productId: number) => void;
   onPlaced: (order: Order) => void;
 }) {
   const [delivery, setDelivery] = useState<"pickup" | "delivery">("pickup");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const total = lines.reduce((n, l) => n + l.product.price * l.quantity, 0);
+  const orderable = lines.filter((l) => l.available);
+  const total = orderable.reduce((n, l) => n + l.price * l.quantity, 0);
 
   const place = async () => {
     setBusy(true);
     setError(null);
     try {
       const order = await api.placeOrder({
-        items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
+        items: orderable.map((l) => ({ productId: l.productId, quantity: l.quantity })),
         deliveryMethod: delivery,
         note,
       });
@@ -141,14 +152,20 @@ function CartPanel({
       ) : (
         <div className="space-y-4">
           <ul className="divide-y divide-row">
-            {lines.map(({ product, quantity }) => (
-              <li key={product.id} className="flex items-center gap-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{product.name}</p>
-                  <p className="text-xs text-muted">{naira(product.price)} each</p>
+            {lines.map((l) => (
+              <li key={l.productId} className="flex items-center gap-3 py-2.5">
+                <div className={cx("min-w-0 flex-1", !l.available && "opacity-60")}>
+                  <p className="truncate text-sm font-medium">{l.name}</p>
+                  {l.available ? (
+                    <p className="text-xs text-muted">{naira(l.price)} each</p>
+                  ) : (
+                    <p className="text-xs text-danger">No longer available. It won&apos;t be ordered.</p>
+                  )}
                 </div>
-                <Stepper value={quantity} max={product.maxQuantity} onChange={(n) => onSetQuantity(product.id, n)} label={product.name} />
-                <button onClick={() => onSetQuantity(product.id, 0)} className="rounded p-1 text-muted hover:bg-row hover:text-danger" aria-label={`Remove ${product.name} from cart`}>
+                {l.available && l.product && (
+                  <Stepper value={l.quantity} max={l.product.maxQuantity} onChange={(n) => onSetQuantity(l.product!, n)} label={l.name} />
+                )}
+                <button onClick={() => onRemove(l.productId)} className="rounded p-1 text-muted hover:bg-row hover:text-danger" aria-label={`Remove ${l.name} from cart`}>
                   <Trash2 size={16} />
                 </button>
               </li>
@@ -188,7 +205,7 @@ function CartPanel({
             <span className="text-xl font-semibold">{naira(total)}</span>
           </div>
           {error && <ErrorState message={error} />}
-          <Button onClick={place} disabled={busy} className="w-full">{busy ? "Placing order…" : "Place order"}</Button>
+          <Button onClick={place} disabled={busy || orderable.length === 0} className="w-full">{busy ? "Placing order…" : "Place order"}</Button>
           <p className="text-xs text-muted">After placing the order, pay by bank transfer and upload your receipt in My orders.</p>
         </div>
       )}
@@ -279,7 +296,7 @@ export default function StorePage() {
   const [category, setCategory] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const [cart, setCart] = useState<SavedLine[]>([]);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -297,27 +314,49 @@ export default function StorePage() {
   const allProducts = useData(() => api.getProducts());
   const orders = useData(api.getOrders);
   const finance = useData(api.getFinanceSummary);
+  const me = useData(api.getProfile);
+  const residentId = me.data?.id ?? null;
 
-  useEffect(() => setCart(readCart()), []);
-  const updateCart = (next: CartLine[]) => {
+  useEffect(() => {
+    if (residentId !== null) setCart(readCart(residentId));
+  }, [residentId]);
+  const updateCart = (next: SavedLine[]) => {
     setCart(next);
-    saveCart(next);
+    if (residentId !== null) saveCart(residentId, next);
   };
-  const setQuantity = (productId: number, n: number) => {
-    const rest = cart.filter((l) => l.productId !== productId);
-    updateCart(n > 0 ? [...rest, { productId, quantity: n }] : rest);
+  const setQuantity = (product: Product, n: number) => {
+    const capped = product.maxQuantity !== null && product.maxQuantity > 0 ? Math.min(n, product.maxQuantity) : n;
+    const line = { productId: product.id, quantity: capped, name: product.name, price: product.price };
+    const exists = cart.some((l) => l.productId === product.id);
+    updateCart(
+      capped <= 0
+        ? cart.filter((l) => l.productId !== product.id)
+        : exists
+          ? cart.map((l) => (l.productId === product.id ? line : l))
+          : [...cart, line],
+    );
   };
+  const removeLine = (productId: number) => updateCart(cart.filter((l) => l.productId !== productId));
 
-  // Cart lines with current product details; drops anything no longer on sale.
-  const cartLines = useMemo(() => {
-    const byId = new Map(allProducts.data?.products.map((p) => [p.id, p]));
-    return cart
-      .map((l) => ({ product: byId.get(l.productId), quantity: l.quantity }))
-      .filter((l): l is { product: Product; quantity: number } => !!l.product && l.product.inStock)
-      .map((l) => ({ ...l, quantity: l.product.maxQuantity !== null ? Math.min(l.quantity, l.product.maxQuantity) : l.quantity }));
+  // Cart lines with the latest prices. Items no longer for sale stay in the cart (marked)
+  // until the resident removes them.
+  const cartLines = useMemo<CartRow[]>(() => {
+    const catalogue = allProducts.data ? new Map(allProducts.data.products.map((p) => [p.id, p])) : null;
+    return cart.map((l) => {
+      const product = catalogue?.get(l.productId) ?? null;
+      const max = product?.maxQuantity ?? null;
+      return {
+        productId: l.productId,
+        name: product?.name ?? l.name,
+        price: product?.price ?? l.price,
+        quantity: max !== null && max > 0 ? Math.min(l.quantity, max) : l.quantity,
+        product,
+        available: catalogue === null ? true : !!product && product.inStock,
+      };
+    });
   }, [cart, allProducts.data]);
   const quantityOf = (id: number) => cart.find((l) => l.productId === id)?.quantity ?? 0;
-  const cartCount = cartLines.reduce((n, l) => n + l.quantity, 0);
+  const cartCount = cartLines.filter((l) => l.available).reduce((n, l) => n + l.quantity, 0);
   const awaiting = orders.data?.filter((o) => o.status === "awaiting_payment").length ?? 0;
 
   const replaceOrder = (updated: Order) => orders.setData((list) => list?.map((o) => (o.id === updated.id ? updated : o)) ?? null);
@@ -417,7 +456,7 @@ export default function StorePage() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {catalogue.data.products.map((p) => (
-                  <ProductCard key={p.id} product={p} quantity={quantityOf(p.id)} onSetQuantity={(n) => setQuantity(p.id, n)} />
+                  <ProductCard key={p.id} product={p} quantity={quantityOf(p.id)} onSetQuantity={(n) => setQuantity(p, n)} />
                 ))}
               </div>
             )}
@@ -428,8 +467,10 @@ export default function StorePage() {
               <CartPanel
                 lines={cartLines}
                 onSetQuantity={setQuantity}
+                onRemove={removeLine}
                 onPlaced={(order) => {
-                  updateCart([]);
+                  const ordered = new Set(order.items.map((i) => i.productId));
+                  updateCart(cart.filter((l) => !ordered.has(l.productId)));
                   orders.setData((list) => [order, ...(list ?? [])]);
                   allProducts.reload().catch(() => undefined);
                   setHighlightId(order.id);

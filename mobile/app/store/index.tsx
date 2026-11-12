@@ -64,7 +64,14 @@ export default function StoreScreen() {
   }, [query]);
 
   const { data, error, loading, refreshing, refresh } = useData(() => api.getProducts({ category: category ?? undefined, q: search }), [category, search]);
-  const categories = useData(() => api.getProducts().then((r) => r.categories));
+  // The full list keeps the cart's prices and availability up to date, and gives the category chips.
+  const { syncProducts } = cart;
+  const categories = useData(() =>
+    api.getProducts().then((r) => {
+      syncProducts(r.products);
+      return r.categories;
+    }),
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.page }}>
@@ -74,7 +81,7 @@ export default function StoreScreen() {
           headerRight: () => <IconButton icon="package" label="My orders" color={colors.brand} onPress={() => router.push("/store/orders")} />,
         }}
       />
-      <Screen onRefresh={refresh} refreshing={refreshing} contentStyle={{ paddingBottom: cart.count ? 110 : 32 }}>
+      <Screen onRefresh={refresh} refreshing={refreshing} contentStyle={{ paddingBottom: cart.items.length ? 110 : 32 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 6, paddingHorizontal: 12 }}>
           <Feather name="search" size={18} color={colors.muted} />
           <TextInput
@@ -107,7 +114,7 @@ export default function StoreScreen() {
         )}
       </Screen>
 
-      {cart.count > 0 && (
+      {cart.items.length > 0 && (
         <View style={{ position: "absolute", left: 16, right: 16, bottom: 16 + insets.bottom }}>
           <Pressable
             onPress={() => router.push("/store/cart")}

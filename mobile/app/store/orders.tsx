@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Alert, View } from "react-native";
 import { BankCard, ReceiptUploadSheet, formatDate, naira } from "@/components/payments";
+import { useReceiptViewer } from "@/components/ReceiptViewer";
 import { ORDER_STATUS } from "@/components/store";
 import { colors } from "@/components/theme";
 import { Button, Card, EmptyState, ErrorState, LoadingState, Screen, SuccessNote, Txt } from "@/components/ui";
@@ -9,9 +10,24 @@ import { api } from "@/lib/api";
 import type { Order } from "@/lib/types";
 import { useData } from "@/lib/use-data";
 
-function OrderCard({ order, highlight, onUpload, onCancel }: { order: Order; highlight: boolean; onUpload: () => void; onCancel: () => void }) {
+function OrderCard({
+  order,
+  highlight,
+  onUpload,
+  onCancel,
+  onViewReceipt,
+  opening,
+}: {
+  order: Order;
+  highlight: boolean;
+  onUpload: () => void;
+  onCancel: () => void;
+  onViewReceipt: () => void;
+  opening: boolean;
+}) {
   const s = ORDER_STATUS[order.status];
   const rejected = order.receipt?.status === "rejected" && order.status === "awaiting_payment";
+  const showReceipt = !!order.receipt && (order.status === "payment_submitted" || rejected);
   const help =
     order.status === "awaiting_payment"
       ? "Pay by bank transfer, then upload your receipt."
@@ -61,9 +77,18 @@ function OrderCard({ order, highlight, onUpload, onCancel }: { order: Order; hig
           </Txt>
         </View>
       )}
-      {(order.canUploadReceipt || order.canCancel) && (
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+      {(order.canUploadReceipt || order.canCancel || showReceipt) && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
           {order.canUploadReceipt && <Button title="Upload receipt" icon="upload" onPress={onUpload} style={{ flex: 1 }} />}
+          {showReceipt && (
+            <Button
+              title={opening ? "Opening…" : order.status === "payment_submitted" ? "View receipt" : "View last receipt"}
+              icon="file-text"
+              variant="outline"
+              onPress={onViewReceipt}
+              disabled={opening}
+            />
+          )}
           {order.canCancel && <Button title="Cancel" variant="outline" onPress={onCancel} />}
         </View>
       )}
@@ -79,6 +104,7 @@ export default function OrdersScreen() {
   const [uploading, setUploading] = useState<Order | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const receipts = useReceiptViewer();
 
   const placedOrder = orders.data?.find((o) => o.id === placedId);
   const awaiting = orders.data?.some((o) => o.status === "awaiting_payment");
@@ -112,6 +138,7 @@ export default function OrdersScreen() {
       )}
       {notice && <SuccessNote>{notice}</SuccessNote>}
       {error && <ErrorState message={error} />}
+      {receipts.error && <ErrorState message={receipts.error} />}
       {awaiting && finance.data && <BankCard bank={finance.data.bank} />}
 
       {orders.loading ? (
@@ -122,9 +149,19 @@ export default function OrdersScreen() {
         <EmptyState>You haven&apos;t ordered anything yet.</EmptyState>
       ) : (
         orders.data.map((o) => (
-          <OrderCard key={o.id} order={o} highlight={o.id === placedId} onUpload={() => setUploading(o)} onCancel={() => confirmCancel(o)} />
+          <OrderCard
+            key={o.id}
+            order={o}
+            highlight={o.id === placedId}
+            onUpload={() => setUploading(o)}
+            onCancel={() => confirmCancel(o)}
+            onViewReceipt={() => o.receipt && receipts.open(o.receipt)}
+            opening={receipts.openingId === o.receipt?.id}
+          />
         ))
       )}
+
+      {receipts.viewer}
 
       <ReceiptUploadSheet
         target={uploading && { key: `order-${uploading.id}`, title: `Order ${uploading.orderNumber}`, amount: uploading.total }}
