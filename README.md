@@ -14,6 +14,8 @@ The project has three parts that share one API:
 
 ## Features
 
+- **Sign up and sign in**: new residents create an account with their name, email, phone and a
+  password, and are signed in straight away
 - **Dashboard**: estate updates, upcoming reminders (which you can mark as done) and a quick
   overview of the household
 - **Emergency alert**: a "life under threat" / SOS button, on every screen, that alerts estate
@@ -67,8 +69,8 @@ php artisan serve         # http://localhost:8000
 
 Demo account: **broklyn@gmail.com** / **password**
 
-The API uses SQLite by default. To use MySQL, set `DB_CONNECTION=mysql` and the `DB_*` values in
-`backend/.env`. `FRONTEND_URL` sets which origin is allowed to call the API (CORS). You can set
+The API uses SQLite for local development. On a real server, use PostgreSQL. Set
+`DB_CONNECTION=pgsql` and the `DB_*` values in `backend/.env`. `FRONTEND_URL` sets which origin is allowed to call the API (CORS). You can set
 the estate name and emergency line with `ESTATE_NAME` and `ESTATE_EMERGENCY_LINE`.
 
 ### 2. Web app
@@ -105,11 +107,12 @@ store builds.
 
 ## API
 
-All endpoints are under `/api`. Every endpoint except login needs an
+All endpoints are under `/api`. Every endpoint except sign-up and login needs an
 `Authorization: Bearer <token>` header.
 
 | Method | Endpoint | Description |
 |---|---|---|
+| POST | `/auth/register` | `{name, email, phone?, password, password_confirmation}`, returns `{token, user}` |
 | POST | `/auth/login` | `{email, password}`, returns `{token, user}` |
 | POST | `/auth/logout` | Revoke the current token |
 | GET | `/resident/dashboard` | Dashboard data |
@@ -126,7 +129,7 @@ All endpoints are under `/api`. Every endpoint except login needs an
 | GET | `/estate/map` | Plots and roads for the estate map |
 
 Responses use Laravel API Resources, wrapped in `{ "data": ... }`, with camelCase fields. The
-TypeScript shapes are in `frontend/src/lib/types.ts`. Login and emergency alerts are
+TypeScript shapes are in `frontend/src/lib/types.ts`. Sign-up, login and emergency alerts are
 rate-limited.
 
 Gate activity, estate updates, payments and map plots are read-only in this app. The admin and
@@ -145,4 +148,18 @@ cd frontend && npm run lint && npm run build
 cd mobile && npm run typecheck && npx expo-doctor
 ```
 
-GitHub Actions runs all of these on every push and pull request.
+GitHub Actions runs all of these on every push and pull request. It runs the API tests twice:
+once on SQLite, and once on PostgreSQL 16. The PostgreSQL job also makes a backup with
+`db:backup`, restores it into a new database and checks that the data matches.
+
+## Backups
+
+```bash
+php artisan db:backup         # back up now (also runs nightly through the scheduler)
+```
+
+Backups go to `BACKUP_PATH` (default `backend/storage/app/backups`). Backups older than
+`BACKUP_KEEP_DAYS` (default 14) are deleted. The demo data is never loaded when `APP_ENV=production`.
+
+The nightly backup needs Laravel's scheduler running on the server:
+`* * * * * cd /path/to/backend && php artisan schedule:run`.

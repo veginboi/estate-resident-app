@@ -1,3 +1,4 @@
+import { Link } from "expo-router";
 import { useRef, useState, type ComponentRef } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -62,6 +63,12 @@ export default function LoginScreen() {
             />
             {error && <ErrorState message={error} />}
             <Button title={busy ? "Signing in…" : "Sign in"} onPress={submit} disabled={busy} />
+            <Txt style={{ textAlign: "center", color: colors.muted, fontSize: 14 }}>
+              New to the estate?{" "}
+              <Link href="/signup" replace>
+                <Txt weight="semibold" style={{ color: colors.brand, fontSize: 14 }}>Create an account</Txt>
+              </Link>
+            </Txt>
             {isMockMode && (
               <Txt style={{ textAlign: "center", color: colors.muted, fontSize: 12 }}>Demo mode: any email and password will work.</Txt>
             )}

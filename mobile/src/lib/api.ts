@@ -69,7 +69,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new Error("Can't reach the estate server. Check your internet connection and try again.");
   }
-  if (res.status === 401 && !path.startsWith("/auth/login")) {
+  if (res.status === 401 && !path.startsWith("/auth/")) {
     await tokenStore.set(null);
     onUnauthorized();
     throw new Error("Your session has expired. Please log in again.");
@@ -127,6 +127,24 @@ export const api = {
     const res = await request<{ token: string }>("/auth/login", {
       method: "POST",
       body: body({ email, password, device_name: `resident-${Platform.OS}` }),
+    });
+    await tokenStore.set(res.token);
+  },
+  register: async (data: { name: string; email: string; phone: string; password: string; passwordConfirmation: string }): Promise<void> => {
+    if (!API_URL) {
+      await tokenStore.set("demo");
+      return delay(undefined);
+    }
+    const res = await request<{ token: string }>("/auth/register", {
+      method: "POST",
+      body: body({
+        name: data.name,
+        email: data.email,
+        phone: data.phone || null,
+        password: data.password,
+        password_confirmation: data.passwordConfirmation,
+        device_name: `resident-${Platform.OS}`,
+      }),
     });
     await tokenStore.set(res.token);
   },

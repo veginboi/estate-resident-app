@@ -11,9 +11,18 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * The demo estate (and its demo login) is only for local development and
+     * testing. It is never seeded on a production server.
      */
     public function run(): void
     {
+        if (app()->isProduction()) {
+            $this->command?->warn('Skipping demo data: APP_ENV is production.');
+
+            return;
+        }
+
         $this->call(DemoEstateSeeder::class);
     }
 }

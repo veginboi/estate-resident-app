@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Resident\ReminderController;
 use App\Http\Controllers\Api\Resident\SettingsController;
 use Illuminate\Support\Facades\Route;
 
+Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:6,1');
 
 Route::middleware('auth:sanctum')->group(function () {

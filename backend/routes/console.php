@@ -1,8 +1,9 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// Nightly database backup. Needs the scheduler cron entry on the server.
+Schedule::command('db:backup')
+    ->dailyAt(config('backup.time'))
+    ->withoutOverlapping()
+    ->onFailure(fn () => logger()->critical('Nightly database backup failed. Run `php artisan db:backup` to see why.'));

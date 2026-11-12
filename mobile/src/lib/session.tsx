@@ -5,6 +5,7 @@ type Session = {
   /** null while the saved token is being read at startup */
   signedIn: boolean | null;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (data: Parameters<typeof api.register>[0]) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -23,6 +24,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signedIn,
       signIn: async (email, password) => {
         await api.login(email, password);
+        setSignedIn(true);
+      },
+      signUp: async (data) => {
+        await api.register(data);
         setSignedIn(true);
       },
       signOut: async () => {

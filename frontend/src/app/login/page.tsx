@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "@/components/AppShell";
@@ -39,8 +40,12 @@ export default function LoginPage() {
           {error && <ErrorState message={error} />}
           <Button type="submit" disabled={busy} className="w-full">{busy ? "Signing in…" : "Sign in"}</Button>
         </form>
+        <p className="mt-6 text-center text-sm text-muted">
+          New to the estate?{" "}
+          <Link href="/signup" className="font-medium text-brand hover:underline">Create an account</Link>
+        </p>
         {isMockMode && (
-          <p className="mt-6 text-center text-xs text-muted">Demo mode: any email and password will work.</p>
+          <p className="mt-3 text-center text-xs text-muted">Demo mode: any email and password will work.</p>
         )}
       </div>
     </main>

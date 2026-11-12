@@ -50,7 +50,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
-  if (res.status === 401 && !path.startsWith("/auth/login")) {
+  if (res.status === 401 && !path.startsWith("/auth/")) {
     auth.setToken(null);
     if (typeof window !== "undefined") window.location.href = "/login";
     throw new Error("Your session has expired. Please log in again.");
@@ -86,6 +86,21 @@ export const api = {
     const res = await request<{ token: string }>("/auth/login", {
       method: "POST",
       body: body({ email, password, device_name: "resident-web" }),
+    });
+    auth.setToken(res.token);
+  },
+  register: async (data: { name: string; email: string; phone: string; password: string; passwordConfirmation: string }): Promise<void> => {
+    if (!API_URL) return delay(undefined);
+    const res = await request<{ token: string }>("/auth/register", {
+      method: "POST",
+      body: body({
+        name: data.name,
+        email: data.email,
+        phone: data.phone || null,
+        password: data.password,
+        password_confirmation: data.passwordConfirmation,
+        device_name: "resident-web",
+      }),
     });
     auth.setToken(res.token);
   },

@@ -42,6 +42,7 @@ Android Keystore via `expo-secure-store`.
 | Tab / screen | File |
 |---|---|
 | Login | `app/login.tsx` |
+| Create an account | `app/signup.tsx` |
 | Home (dashboard, reminders, estate update, emergency button) | `app/(tabs)/index.tsx` |
 | Activity (family check-in/out, filter by day) | `app/(tabs)/activity.tsx` |
 | Estate map | `app/(tabs)/estate-map.tsx` |

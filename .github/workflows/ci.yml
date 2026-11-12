@@ -34,6 +34,78 @@ jobs:
       - name: Run tests
         run: php artisan test
 
+  backend-postgres:
+    name: Backend on PostgreSQL (tests, backup & restore)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lincolnestate
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: testing
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lincolnestate"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: lincolnestate
+      DB_PASSWORD: secret
+      DB_DATABASE: testing
+      PGPASSWORD: secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, pdo_pgsql, pgsql, bcmath
+          coverage: none
+
+      - name: Install PostgreSQL client tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-16
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run tests on PostgreSQL
+        run: php artisan test
+
+      - name: Migrate and seed a fresh database
+        env:
+          DB_DATABASE: lincolnestate
+        run: |
+          psql -h 127.0.0.1 -U lincolnestate -d testing -c "CREATE DATABASE lincolnestate"
+          php artisan migrate --seed --force
+
+      - name: Back up and restore the database
+        env:
+          DB_DATABASE: lincolnestate
+          BACKUP_PATH: ${{ runner.temp }}/backups
+        run: |
+          php artisan db:backup
+          dump=$(ls "$BACKUP_PATH"/pgsql-*.dump)
+          psql -h 127.0.0.1 -U lincolnestate -d testing -c "CREATE DATABASE restored"
+          pg_restore --no-owner -h 127.0.0.1 -U lincolnestate -d restored "$dump"
+          original=$(psql -h 127.0.0.1 -U lincolnestate -d lincolnestate -tAc "SELECT count(*) FROM users")
+          restored=$(psql -h 127.0.0.1 -U lincolnestate -d restored -tAc "SELECT count(*) FROM users")
+          echo "users: original=$original restored=$restored"
+          test "$original" -gt 0 && test "$original" = "$restored"
+
   frontend:
     name: Frontend lint & build (Next.js)
     runs-on: ubuntu-latest
