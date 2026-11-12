@@ -1,100 +1,148 @@
-# LincolnEstate: Resident App
+# LincolnEstate Resident App
 
-The resident-facing part of the LincolnEstate estate management system.
+The resident side of the LincolnEstate estate management system. Residents can see what is
+happening in their estate, manage their household and properties, track family check-ins and
+check-outs at the gate, and send an emergency alert to estate security.
+
+The project has three parts that share one API:
+
+| Part | Stack | Folder |
+|---|---|---|
+| Web app | Next.js 15, React 19, TypeScript, Tailwind CSS v4 | [`frontend/`](frontend) |
+| Mobile app (iOS + Android) | Expo, React Native, Expo Router, TypeScript | [`mobile/`](mobile) |
+| API | Laravel 13, PHP 8.3+, Sanctum token auth | [`backend/`](backend) |
+
+## Features
+
+- **Dashboard**: estate updates, upcoming reminders (which you can mark as done) and a quick
+  overview of the household
+- **Emergency alert**: a "life under threat" / SOS button, on every screen, that alerts estate
+  security after you confirm
+- **Profile**: personal details and an About section
+- **Family members**: add, edit and remove the people in your household
+- **Properties**: register and manage your vehicles and other property
+- **Activity**: family gate check-ins and check-outs, which you can filter by day
+- **Estate map**: an interactive map of plots and roads in the estate
+- **Settings**: SMS and email notifications, chat preferences and password change
+
+Finance, Store and Messages are placeholders for now.
+
+## Project structure
 
 ```
 estate-resident-app/
-├── frontend/   Next.js 15 + TypeScript + Tailwind CSS v4
-├── mobile/     Expo (React Native) app for iOS and Android
-├── backend/    Laravel 13 API with Sanctum token auth
-└── .github/    CI: backend tests, frontend lint/build and mobile checks on every push
+├── backend/            Laravel API
+│   ├── app/Http/       controllers, form requests, API resources
+│   ├── app/Models/     Eloquent models
+│   ├── database/       migrations, factories, demo seeder
+│   ├── routes/api.php  every API route
+│   └── tests/Feature/  a feature test for each endpoint
+├── frontend/           Next.js web app
+│   └── src/
+│       ├── app/        pages (App Router)
+│       ├── components/ layout shell and shared UI
+│       └── lib/        API client, types, sample data
+├── mobile/             Expo app
+│   ├── app/            screens (Expo Router)
+│   └── src/            components, API client, session, types
+└── .github/workflows/  CI
 ```
 
-## Running the backend
+## Getting started
 
-Requires PHP 8.3+ and Composer.
+### Requirements
+
+- PHP 8.3+ and Composer
+- Node.js 22 LTS and npm
+- The Expo Go app on your phone, if you want to run the mobile app on a device
+
+### 1. API
 
 ```bash
 cd backend
-composer run setup    # installs packages, creates .env + SQLite DB, migrates and seeds demo data
+composer run setup        # installs dependencies, creates .env and the SQLite database, migrates and seeds
 php artisan storage:link
-php artisan serve     # http://localhost:8000
-php artisan test      # feature tests for every endpoint
+php artisan serve         # http://localhost:8000
 ```
 
-Demo login (from `DemoEstateSeeder`): **broklyn@gmail.com** / **password**
+Demo account: **broklyn@gmail.com** / **password**
 
-To use MySQL instead of SQLite, set `DB_CONNECTION=mysql` and the `DB_*` values in `backend/.env`.
-`FRONTEND_URL` in `.env` controls which origin may call the API (CORS).
+The API uses SQLite by default. To use MySQL, set `DB_CONNECTION=mysql` and the `DB_*` values in
+`backend/.env`. `FRONTEND_URL` sets which origin is allowed to call the API (CORS). You can set
+the estate name and emergency line with `ESTATE_NAME` and `ESTATE_EMERGENCY_LINE`.
 
-## Running the frontend
+### 2. Web app
 
 ```bash
 cd frontend
-nvm use 22        # Node 26 doesn't run on macOS 12
 npm install
-npm run dev       # http://localhost:3000
+npm run dev               # http://localhost:3000
 ```
 
-Without a backend, the app runs on sample data from `src/lib/mock-data.ts`. Changes you make
-(adding a family member, editing settings, etc.) last until you reload the page.
-
-To use the Laravel API, create `frontend/.env.local`:
+To connect to the API, create `frontend/.env.local`:
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000/api
 ```
 
-## Running the mobile app
+### 3. Mobile app
 
 ```bash
 cd mobile
-nvm use 22
 npm install
-npm start         # scan the QR code with the Expo Go app on your phone
+npm start                 # scan the QR code with Expo Go
 ```
 
-Like the web app, it runs on sample data until you point it at the API. See `mobile/README.md`.
+A phone can't reach `localhost` on your computer. To connect to the API, start Laravel with
+`php artisan serve --host=0.0.0.0`. Then copy `mobile/.env.example` to `mobile/.env` and set
+`EXPO_PUBLIC_API_URL` to your computer's address on the Wi-Fi network, for example
+`http://192.168.1.10:8000/api`. See [`mobile/README.md`](mobile/README.md) for simulators and
+store builds.
 
-## Jira tasks → pages
+> **Sample data mode:** if no API URL is set, the web and mobile apps both run on built-in
+> sample data (`src/lib/mock-data.ts`). You can try the UI this way without running the backend.
+> Changes last until you reload the page or restart the app.
 
-| Task | Route | Files |
+## API
+
+All endpoints are under `/api`. Every endpoint except login needs an
+`Authorization: Bearer <token>` header.
+
+| Method | Endpoint | Description |
 |---|---|---|
-| Resident dashboard (desktop + mobile) | `/dashboard` | `src/app/(resident)/dashboard/page.tsx` |
-| (supporting) Login | `/login` | `src/app/login/page.tsx` |
-| Resident profile + About | `/profile` | `src/app/(resident)/profile/layout.tsx`, `page.tsx` |
-| Family members management | `/profile/family` | `src/app/(resident)/profile/family/page.tsx` |
-| Property registration + management | `/profile/properties` | `src/app/(resident)/profile/properties/page.tsx` |
-| Resident activity | `/activity` | `src/app/(resident)/activity/page.tsx` |
-| Resident settings | `/profile/settings` | `src/app/(resident)/profile/settings/page.tsx` |
-| Estate map | `/estate-map` | `src/app/(resident)/estate-map/page.tsx` |
-
-The layout (sidebar, header, emergency button) is in `src/components/AppShell.tsx`.
-Shared UI pieces are in `src/components/ui.tsx`.
-
-## API contract for the Laravel backend
-
-All frontend calls go through `frontend/src/lib/api.ts` (and `mobile/src/lib/api.ts` for the mobile app). Responses may be wrapped in
-`{ "data": ... }` (Laravel API Resources). Field names are camelCase; the shapes are
-in `frontend/src/lib/types.ts`.
-
-| Method | Endpoint | Body / returns |
-|---|---|---|
-| GET | `/resident/dashboard` | `DashboardData` |
-| POST | `/resident/emergency-alerts` | sends a "life under threat" alert |
-| GET / PUT | `/resident/profile` | `Profile`; PUT accepts `name`, `phone`, `about` |
-| GET / POST | `/resident/family-members` | `FamilyMember[]` / create `{name, role, age, gender}` |
-| PUT / DELETE | `/resident/family-members/{id}` | update / remove |
-| GET / POST | `/resident/properties` | `Property[]` / create `{type, name, number, colour, details}` |
-| PUT / DELETE | `/resident/properties/{id}` | update / remove |
-| GET | `/resident/activities?date=YYYY-MM-DD` | `Activity[]` (date is optional) |
+| POST | `/auth/login` | `{email, password}`, returns `{token, user}` |
+| POST | `/auth/logout` | Revoke the current token |
+| GET | `/resident/dashboard` | Dashboard data |
+| GET / PUT | `/resident/profile` | View or update `name`, `phone`, `about` |
+| GET / POST | `/resident/family-members` | List, or add `{name, role, age, gender}` |
+| PUT / DELETE | `/resident/family-members/{id}` | Update or remove a family member |
+| GET / POST | `/resident/properties` | List, or add `{type, name, number, colour, details}` |
+| PUT / DELETE | `/resident/properties/{id}` | Update or remove a property |
+| GET | `/resident/activities?date=YYYY-MM-DD` | Gate activity (`date` is optional) |
+| PATCH | `/resident/reminders/{id}` | `{done}`, mark a reminder as done |
 | GET / PUT | `/resident/settings` | `{smsNotifications, emailNotifications, allowChat}` |
 | PUT | `/resident/password` | `{current_password, password, password_confirmation}` |
-| GET | `/estate/map` | `EstateMap` |
+| POST | `/resident/emergency-alerts` | Send an emergency alert |
+| GET | `/estate/map` | Plots and roads for the estate map |
 
-Authentication: `POST /auth/login` with `{email, password}` returns `{token, user}`. The frontend
-stores the token and sends it as `Authorization: Bearer <token>`. `POST /auth/logout` revokes it.
-`PATCH /resident/reminders/{id}` with `{done}` marks a dashboard reminder as done.
+Responses use Laravel API Resources, wrapped in `{ "data": ... }`, with camelCase fields. The
+TypeScript shapes are in `frontend/src/lib/types.ts`. Login and emergency alerts are
+rate-limited.
 
-Gate activity, estate updates, payments and map plots are read-only here; they are written by
-the admin/security side of the system.
+Gate activity, estate updates, payments and map plots are read-only in this app. The admin and
+security parts of the system write them.
+
+## Testing
+
+```bash
+# API
+cd backend && php artisan test && vendor/bin/pint --test
+
+# Web
+cd frontend && npm run lint && npm run build
+
+# Mobile
+cd mobile && npm run typecheck && npx expo-doctor
+```
+
+GitHub Actions runs all of these on every push and pull request.
