@@ -27,6 +27,11 @@ function RootStack() {
   return (
     <Stack
       screenOptions={{
+        // A solid header, so screen content always starts below it. (On recent iPhones the
+        // default header is see-through and content would slide underneath it.)
+        headerTransparent: false,
+        headerStyle: { backgroundColor: colors.white },
+        headerShadowVisible: true,
         headerTintColor: colors.brand,
         headerTitleStyle: { fontFamily: fonts.semibold, color: colors.brand },
         headerBackButtonDisplayMode: "minimal",

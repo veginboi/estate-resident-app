@@ -61,6 +61,7 @@ export default function MessagesScreen() {
         </View>
       ) : (
         <FlatList
+          contentInsetAdjustmentBehavior="automatic"
           data={data ?? []}
           keyExtractor={(c) => String(c.id)}
           style={{ backgroundColor: colors.white }}

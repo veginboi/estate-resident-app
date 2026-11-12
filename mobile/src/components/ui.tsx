@@ -47,6 +47,7 @@ export function Screen({
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.page }}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={[{ padding: 16, paddingBottom: 32, gap: 16 }, contentStyle]}
       keyboardShouldPersistTaps="handled"
       refreshControl={

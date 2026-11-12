@@ -59,6 +59,7 @@ export default function NewChatScreen() {
         <LoadingState />
       ) : (
         <FlatList
+          contentInsetAdjustmentBehavior="automatic"
           data={results}
           keyExtractor={(n) => String(n.id)}
           keyboardShouldPersistTaps="handled"
