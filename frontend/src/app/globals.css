@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* Design tokens taken from the LincolnEstate Figma file */
+@theme {
+  --color-brand: #12a14a;
+  --color-brand-dark: #0d8a3e;
+  --color-brand-soft: #c9f7d4;
+  --color-brand-tint: #eefcf1;
+  --color-danger: #ff1a1a;
+  --color-page: #f7f7f7;
+  --color-ink: #111111;
+  --color-muted: #8a8a8a;
+  --color-line: #d9d9d9;
+  --color-row: #ececec;
+
+}
+
+@theme inline {
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+}

@@ -1,0 +1,140 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\EstateUpdate;
+use App\Models\Plot;
+use App\Models\User;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Storage;
+
+/**
+ * Demo data matching the resident app designs.
+ *
+ * Demo login: broklyn@gmail.com / password
+ */
+class DemoEstateSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $disk = Storage::disk('public');
+        foreach (['house.jpg', 'news.jpg'] as $image) {
+            $disk->put("seed/{$image}", file_get_contents(__DIR__."/images/{$image}"));
+        }
+
+        $david = User::factory()->create([
+            'resident_code' => 'LEHN123B',
+            'name' => 'David Onyemenam',
+            'email' => 'broklyn@gmail.com',
+            'phone' => '+234 810 000 0000',
+            'about' => 'Resident of LincolnEstate since 2021. I live in Block B with my wife and son, and I\'m happy to help neighbours with anything around the estate.',
+            'cover_path' => 'seed/house.jpg',
+            'sms_notifications' => true,
+            'email_notifications' => false,
+            'allow_chat' => true,
+        ]);
+
+        $members = collect([
+            ['name' => 'David Onyemenam', 'role' => 'Husband', 'age' => 36, 'gender' => 'Male'],
+            ['name' => 'Grace Onyemenam', 'role' => 'Wife', 'age' => 34, 'gender' => 'Female'],
+            ['name' => 'Daniel Onyemenam', 'role' => 'Child', 'age' => 8, 'gender' => 'Male'],
+        ])->mapWithKeys(fn (array $member) => [$member['name'] => $david->familyMembers()->create($member)]);
+
+        $david->properties()->createMany([
+            ['type' => 'House', 'name' => 'LE B001-SECTION', 'number' => 'LHEB001', 'colour' => 'Green', 'details' => '8 Bed Room'],
+            ['type' => 'Car', 'name' => 'Lexus', 'number' => 'FCT0023JB', 'colour' => 'Red', 'details' => 'RX350'],
+        ]);
+
+        $today = today();
+        $yesterday = today()->subDay();
+        foreach ([
+            ['David Onyemenam', $today, '08:30', 'Family', '18:45', 'Alone'],
+            ['Grace Onyemenam', $today, '08:30', 'Family', '18:45', 'Wife'],
+            ['Daniel Onyemenam', $today, '07:15', 'Driver', '14:20', 'Driver'],
+            ['David Onyemenam', $yesterday, '09:05', 'Alone', '20:10', 'Alone'],
+            ['Grace Onyemenam', $yesterday, '11:30', 'Daniel', null, null],
+        ] as [$name, $date, $outAt, $outWith, $inAt, $inWith]) {
+            $david->activities()->create([
+                'family_member_id' => $members[$name]->id,
+                'name' => $name,
+                'date' => $date->toDateString(),
+                'out_at' => $outAt,
+                'out_with' => $outWith,
+                'in_at' => $inAt,
+                'in_with' => $inWith,
+            ]);
+        }
+
+        foreach ([
+            ['Estate service charge for November is due on the 15th.', false],
+            ['Residents\' general meeting at the clubhouse this Saturday.', false],
+            ['Water supply maintenance on Main Avenue, 10am to 2pm.', true],
+            ['Renew your car sticker at the security post.', false],
+        ] as [$text, $done]) {
+            $david->reminders()->create([
+                'text' => $text,
+                'remind_at' => $today->copy()->setTime(9, 30),
+                'done_at' => $done ? now() : null,
+            ]);
+        }
+
+        $david->payments()->createMany([
+            ['description' => 'Service charge (October)', 'amount' => 10000, 'paid_at' => now()->subMonth()],
+            ['description' => 'Service charge (November)', 'amount' => 10000, 'paid_at' => now()->subDays(3)],
+        ]);
+
+        EstateUpdate::create([
+            'author' => 'Estate Admin',
+            'body' => 'Police patrols are increasing around the estate this week after reports from neighbouring streets. Please make sure every visitor is registered at the gate.',
+            'image_path' => 'seed/news.jpg',
+            'published_at' => $today->copy()->setTime(12, 30),
+        ]);
+
+        $this->seedMap($david);
+    }
+
+    private function seedMap(User $david): void
+    {
+        $neighbours = [
+            'A2' => User::factory()->create(['name' => 'Mr. Esele Andrew', 'resident_code' => 'EHN102']),
+            'A7' => User::factory()->create(['name' => 'Mr. Victor Aguh', 'resident_code' => 'EHN107']),
+            'B3' => User::factory()->create(['name' => 'Mr. Iroha .C', 'resident_code' => 'EHN203']),
+            'C2' => User::factory()->create(['name' => 'Mrs. Bola Ade', 'resident_code' => 'EHN302']),
+        ];
+
+        $rows = [
+            ['A', 1, [30, 140, 250, 360], 30, 115],
+            ['A', 5, [30, 140, 250, 360], 165, 115],
+            ['B', 1, [530, 640, 750, 860], 30, 115],
+            ['B', 5, [530, 640, 750, 860], 165, 115],
+            ['C', 1, [530, 640, 750, 860], 360, 120],
+            ['C', 5, [530, 640, 750, 860], 500, 120],
+        ];
+
+        foreach ($rows as [$block, $start, $xs, $y, $h]) {
+            foreach ($xs as $i => $x) {
+                $code = $block.($start + $i);
+                Plot::create([
+                    'code' => $code,
+                    'label' => $code,
+                    'kind' => 'residential',
+                    'x' => $x,
+                    'y' => $y,
+                    'w' => 100,
+                    'h' => $h,
+                    'user_id' => $code === 'B1' ? $david->id : ($neighbours[$code]->id ?? null),
+                    'description' => $code === 'B1' ? 'LE B001-SECTION · 8 Bed Room' : null,
+                ]);
+            }
+        }
+
+        foreach ([
+            ['SEC', 'Security Post', 'security', 30, 360, 100, 80, 'Main gate and visitor registration. Open 24 hours.'],
+            ['PARK', 'Park', 'green', 140, 360, 320, 80, 'Children\'s playground and walking track.'],
+            ['CLUB', 'Clubhouse', 'amenity', 30, 460, 210, 160, 'Hall for meetings and events, plus the gym and pool.'],
+            ['ADMIN', 'Estate Office', 'amenity', 250, 460, 210, 160, 'Estate management, payments and complaints. Mon–Sat, 8am–5pm.'],
+        ] as [$code, $label, $kind, $x, $y, $w, $h, $description]) {
+            Plot::create(compact('code', 'label', 'kind', 'x', 'y', 'w', 'h', 'description'));
+        }
+    }
+}
