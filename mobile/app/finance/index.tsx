@@ -1,26 +1,15 @@
 import { Feather } from "@expo/vector-icons";
-import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
 import { Stack } from "expo-router";
 import { useState, type ComponentProps } from "react";
 import { View } from "react-native";
+import { BankCard, ReceiptUploadSheet, formatDate, naira } from "@/components/payments";
 import { colors } from "@/components/theme";
-import { Button, Card, Chip, EmptyState, ErrorState, Field, LoadingState, Screen, Sheet, SuccessNote, Txt } from "@/components/ui";
+import { Button, Card, Chip, EmptyState, ErrorState, LoadingState, Screen, SuccessNote, Txt } from "@/components/ui";
 import { api, isMockMode } from "@/lib/api";
 import type { Bill, BillStatus, FinanceSummary, Payment } from "@/lib/types";
 import { useData } from "@/lib/use-data";
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "application/pdf"];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const METHODS: Record<string, string> = { bank_transfer: "Bank transfer", cash: "Cash", card: "Card", pos: "POS" };
-
-const naira = (n: number) => `NGN ${n.toLocaleString("en-NG", { maximumFractionDigits: 2 })}`;
-const isoDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const formatDate = (value: string) => {
-  const d = new Date(value.length === 10 ? `${value}T00:00:00` : value);
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-};
 
 const STATUS: Record<BillStatus, { label: string; bg: string; fg: string }> = {
   overdue: { label: "Overdue", bg: colors.dangerSoft, fg: colors.danger },
@@ -120,110 +109,6 @@ function PaymentRow({ p }: { p: Payment }) {
   );
 }
 
-type Picked = { uri: string; name: string; type: string; size?: number };
-
-function UploadSheet({ bill, onClose, onUploaded }: { bill: Bill | null; onClose: () => void; onUploaded: (b: Bill) => void }) {
-  const [amount, setAmount] = useState("");
-  const [paidOn, setPaidOn] = useState(isoDate(new Date()));
-  const [reference, setReference] = useState("");
-  const [file, setFile] = useState<Picked | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [openedFor, setOpenedFor] = useState<number | null>(null);
-
-  // Reset the form each time it opens for a bill.
-  if (bill && openedFor !== bill.id) {
-    setOpenedFor(bill.id);
-    setAmount(String(bill.amount));
-    setPaidOn(isoDate(new Date()));
-    setReference("");
-    setFile(null);
-    setError(null);
-    setBusy(false);
-  }
-  if (!bill && openedFor !== null) setOpenedFor(null);
-
-  const today = isoDate(new Date());
-  const yesterday = isoDate(new Date(Date.now() - 86_400_000));
-
-  const pickPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
-    if (result.canceled) return;
-    const a = result.assets[0];
-    setFile({ uri: a.uri, name: a.fileName ?? "receipt.jpg", type: a.mimeType ?? "image/jpeg", size: a.fileSize });
-  };
-
-  const pickFile = async () => {
-    const result = await DocumentPicker.getDocumentAsync({ type: ALLOWED_TYPES, copyToCacheDirectory: true });
-    if (result.canceled) return;
-    const a = result.assets[0];
-    setFile({ uri: a.uri, name: a.name, type: a.mimeType ?? "application/octet-stream", size: a.size });
-  };
-
-  const submit = async () => {
-    if (!bill) return;
-    const value = Number(amount.replace(/,/g, ""));
-    if (!file) return setError("Choose a photo or file of your transfer receipt.");
-    if (!ALLOWED_TYPES.includes(file.type)) return setError("The receipt must be a photo (JPG or PNG) or a PDF.");
-    if (file.size && file.size > MAX_FILE_BYTES) return setError("The receipt must be smaller than 5 MB.");
-    if (!Number.isFinite(value) || value < 1) return setError("Enter the amount you transferred.");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn) || paidOn > today) return setError("Enter the transfer date as YYYY-MM-DD, not in the future.");
-
-    setBusy(true);
-    setError(null);
-    try {
-      onUploaded(await api.uploadReceipt(bill.id, { file: { uri: file.uri, name: file.name, type: file.type }, amount: value, paidOn, transferReference: reference }));
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Sheet title="Upload transfer receipt" open={!!bill} onClose={onClose}>
-      {bill && (
-        <>
-          <View style={{ backgroundColor: colors.row, borderRadius: 6, padding: 12 }}>
-            <Txt weight="medium">{bill.title}</Txt>
-            <Txt style={{ color: colors.muted, fontSize: 13 }}>{naira(bill.amount)}</Txt>
-          </View>
-          <Field label="Amount transferred (NGN)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
-          {Number(amount) > 0 && Number(amount) !== bill.amount && (
-            <Txt style={{ fontSize: 12, color: colors.amber }}>This is different from the bill amount. The estate will check it before confirming.</Txt>
-          )}
-          <View style={{ gap: 6 }}>
-            <Txt weight="medium" style={{ fontSize: 14 }}>
-              Date of transfer
-            </Txt>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <Chip label="Today" active={paidOn === today} onPress={() => setPaidOn(today)} role="radio" />
-              <Chip label="Yesterday" active={paidOn === yesterday} onPress={() => setPaidOn(yesterday)} role="radio" />
-            </View>
-            <Field label="Or enter a date (YYYY-MM-DD)" value={paidOn} onChangeText={setPaidOn} keyboardType="numbers-and-punctuation" maxLength={10} />
-          </View>
-          <Field label="Transfer reference (optional)" value={reference} onChangeText={setReference} maxLength={60} autoCapitalize="characters" />
-          <View style={{ gap: 8 }}>
-            <Txt weight="medium" style={{ fontSize: 14 }}>
-              Receipt (JPG, PNG or PDF, up to 5 MB)
-            </Txt>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <Button title="Choose photo" icon="image" variant="outline" onPress={pickPhoto} style={{ flex: 1 }} />
-              <Button title="Choose file" icon="file" variant="outline" onPress={pickFile} style={{ flex: 1 }} />
-            </View>
-            {file && (
-              <Txt style={{ fontSize: 13, color: colors.muted }} numberOfLines={1}>
-                Selected: {file.name}
-              </Txt>
-            )}
-          </View>
-          {error && <ErrorState message={error} />}
-          <Button title={busy ? "Uploading…" : "Send receipt"} onPress={submit} disabled={busy} />
-        </>
-      )}
-    </Sheet>
-  );
-}
-
 export default function FinanceScreen() {
   const summary = useData(api.getFinanceSummary);
   const bills = useData(() => api.getBills());
@@ -259,39 +144,7 @@ export default function FinanceScreen() {
             <Stat icon="check-circle" value={naira(s.paidThisYear)} label={`Paid in ${new Date().getFullYear()}`} />
           </View>
 
-          <Card style={{ padding: 16, gap: 10 }}>
-            <Txt weight="semibold" style={{ color: colors.brand, fontSize: 16 }} accessibilityRole="header">
-              How to pay
-            </Txt>
-            {s.bank ? (
-              <>
-                <Txt style={{ fontSize: 13, color: colors.muted }}>
-                  Pay by bank transfer to the estate account below, then upload your transfer receipt on the bill.
-                </Txt>
-                <View style={{ gap: 6 }}>
-                  <Txt style={{ fontSize: 14 }}>
-                    <Txt style={{ color: colors.muted, fontSize: 14 }}>Bank: </Txt>
-                    {s.bank.bankName}
-                  </Txt>
-                  <Txt style={{ fontSize: 14 }}>
-                    <Txt style={{ color: colors.muted, fontSize: 14 }}>Account name: </Txt>
-                    {s.bank.accountName}
-                  </Txt>
-                  <Txt style={{ fontSize: 14 }} selectable>
-                    <Txt style={{ color: colors.muted, fontSize: 14 }}>Account number: </Txt>
-                    <Txt weight="semibold" style={{ fontSize: 16, letterSpacing: 1 }}>
-                      {s.bank.accountNumber}
-                    </Txt>
-                  </Txt>
-                  <Txt style={{ fontSize: 11, color: colors.muted }}>Press and hold the account number to copy it.</Txt>
-                </View>
-              </>
-            ) : (
-              <Txt style={{ fontSize: 13, color: colors.muted }}>
-                The estate hasn&apos;t added its bank details yet. Please contact the estate office to pay.
-              </Txt>
-            )}
-          </Card>
+          <BankCard bank={s.bank} />
         </>
       )}
 
@@ -345,10 +198,12 @@ export default function FinanceScreen() {
         <Txt style={{ color: colors.muted, fontSize: 12, textAlign: "center" }}>Demo mode: receipts you upload aren&apos;t saved.</Txt>
       )}
 
-      <UploadSheet
-        bill={uploading}
+      <ReceiptUploadSheet
+        target={uploading && { key: `bill-${uploading.id}`, title: uploading.title, amount: uploading.amount }}
         onClose={() => setUploading(null)}
-        onUploaded={(updated) => {
+        onSubmit={async (data) => {
+          if (!uploading) return;
+          const updated = await api.uploadReceipt(uploading.id, data);
           setUploading(null);
           bills.setData((list) => list?.map((b) => (b.id === updated.id ? updated : b)) ?? null);
           summary.refresh();

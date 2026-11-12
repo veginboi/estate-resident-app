@@ -151,6 +151,7 @@ export interface Payment {
   method: string | null; // e.g. bank_transfer
   paidAt: string; // ISO 8601
   bill: { id: number; title: string } | null;
+  order: { id: number; orderNumber: string } | null;
 }
 
 export interface BankDetails {
@@ -174,4 +175,48 @@ export interface ReceiptUpload {
   amount: number;
   paidOn: string; // YYYY-MM-DD
   transferReference: string;
+}
+
+export interface Product {
+  id: number;
+  name: string;
+  description: string | null;
+  category: string;
+  price: number;
+  unit: string | null; // e.g. "per car", "12.5 kg"
+  imageUrl: string | null;
+  inStock: boolean;
+  maxQuantity: number | null; // most you can order at once (stock or per-order limit)
+}
+
+export type OrderStatus = "awaiting_payment" | "payment_submitted" | "processing" | "ready" | "completed" | "cancelled";
+
+export interface OrderItem {
+  id: number;
+  productId: number | null;
+  name: string;
+  unit: string | null;
+  unitPrice: number;
+  quantity: number;
+  lineTotal: number;
+}
+
+export interface Order {
+  id: number;
+  orderNumber: string; // e.g. ORD-000012
+  status: OrderStatus;
+  items: OrderItem[];
+  total: number;
+  deliveryMethod: "pickup" | "delivery";
+  note: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  canUploadReceipt: boolean;
+  canCancel: boolean;
+  receipt: BillReceipt | null;
+}
+
+export interface CartLine {
+  productId: number;
+  quantity: number;
 }

@@ -9,7 +9,9 @@ import type {
   FamilyMember,
   MapPlot,
   Neighbour,
+  Order,
   Payment,
+  Product,
   Profile,
   Property,
   Settings,
@@ -251,6 +253,65 @@ export const bills: Bill[] = [
 ];
 
 export const payments: Payment[] = [
-  { id: 2, receiptNumber: "LE-000002", description: "Service charge (November)", amount: 10000, method: "bank_transfer", paidAt: daysAgo(3), bill: { id: 4, title: "Service charge (November)" } },
-  { id: 1, receiptNumber: "LE-000001", description: "Service charge (October)", amount: 10000, method: "bank_transfer", paidAt: daysAgo(31), bill: { id: 5, title: "Service charge (October)" } },
+  { id: 3, receiptNumber: "LE-000003", description: "Store order ORD-000001", amount: 10000, method: "bank_transfer", paidAt: daysAgo(20), bill: null, order: { id: 1, orderNumber: "ORD-000001" } },
+  { id: 2, receiptNumber: "LE-000002", description: "Service charge (November)", amount: 10000, method: "bank_transfer", paidAt: daysAgo(3), bill: { id: 4, title: "Service charge (November)" }, order: null },
+  { id: 1, receiptNumber: "LE-000001", description: "Service charge (October)", amount: 10000, method: "bank_transfer", paidAt: daysAgo(31), bill: { id: 5, title: "Service charge (October)" }, order: null },
+];
+
+// ---- Store ----
+
+const product = (id: number, name: string, description: string, category: string, price: number, unit: string | null, inStock = true, maxQuantity: number | null = null): Product => ({
+  id,
+  name,
+  description,
+  category,
+  price,
+  unit,
+  imageUrl: null,
+  inStock,
+  maxQuantity,
+});
+
+export const products: Product[] = [
+  product(1, "Car sticker (2026)", "Windscreen sticker that lets your car through the main gate. One per vehicle.", "Access & Security", 5000, "per car", true, 3),
+  product(2, "Gate access tag", "Contactless tag for the pedestrian gate. Replacement for lost tags.", "Access & Security", 7500, "per tag", true, 4),
+  product(3, "Visitor pass booklet", "25 pre-signed visitor passes for regular guests and deliveries.", "Access & Security", 2000, "25 passes"),
+  product(4, "Cooking gas refill", "Refill delivered and connected by the estate gas vendor.", "Home", 18000, "12.5 kg", true, 2),
+  product(5, "Table water", "Sachet water from the estate supplier.", "Home", 600, "per bag", true, 20),
+  product(6, "Waste bin (120 L)", "Wheeled bin approved for estate waste collection.", "Home", 25000, null, true, 2),
+  product(7, "Estate polo shirt", "Green LincolnEstate polo for residents' events. Sizes S to XXL.", "Merchandise", 8000, null, false),
+];
+
+export const orders: Order[] = [
+  {
+    id: 2,
+    orderNumber: "ORD-000002",
+    status: "awaiting_payment",
+    items: [
+      { id: 2, productId: 4, name: "Cooking gas refill", unit: "12.5 kg", unitPrice: 18000, quantity: 1, lineTotal: 18000 },
+      { id: 3, productId: 5, name: "Table water", unit: "per bag", unitPrice: 600, quantity: 4, lineTotal: 2400 },
+    ],
+    total: 20400,
+    deliveryMethod: "delivery",
+    note: "Please deliver after 4pm.",
+    createdAt: daysAgo(0.1),
+    paidAt: null,
+    canUploadReceipt: true,
+    canCancel: true,
+    receipt: null,
+  },
+  {
+    id: 1,
+    orderNumber: "ORD-000001",
+    status: "completed",
+    items: [{ id: 1, productId: 1, name: "Car sticker (2026)", unit: "per car", unitPrice: 5000, quantity: 2, lineTotal: 10000 }],
+    total: 10000,
+    deliveryMethod: "pickup",
+    note: null,
+    createdAt: daysAgo(21),
+    paidAt: daysAgo(20),
+    canUploadReceipt: false,
+    canCancel: false,
+    receipt: null,
+  },
 ];

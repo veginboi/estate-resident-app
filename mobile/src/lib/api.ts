@@ -10,8 +10,11 @@ import type {
   EstateMap,
   FamilyMember,
   FinanceSummary,
+  CartLine,
   Neighbour,
+  Order,
   Payment,
+  Product,
   Profile,
   Property,
   ReceiptUpload,
@@ -99,6 +102,16 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 const body = (data: unknown) => JSON.stringify(data);
 
+const receiptForm = (data: ReceiptUpload) => {
+  const form = new FormData();
+  // React Native uploads a picked file from its uri.
+  form.append("receipt", data.file as unknown as Blob);
+  form.append("amount", String(data.amount));
+  form.append("paid_on", data.paidOn);
+  if (data.transferReference.trim()) form.append("transfer_reference", data.transferReference.trim());
+  return form;
+};
+
 // ---- in-memory store for mock mode ----
 const clone = <T,>(value: T): T => (value === undefined ? value : JSON.parse(JSON.stringify(value)));
 const store = {
@@ -147,6 +160,72 @@ const mockFinance = {
       },
     } satisfies Partial<Bill>);
     return bill;
+  },
+};
+
+// In-memory shop for mock mode.
+const storeStore = { orders: clone(mock.orders) };
+const mockStore = {
+  products: ({ category, q }: { category?: string; q?: string }) => {
+    const needle = q?.trim().toLowerCase() ?? "";
+    return {
+      products: mock.products.filter(
+        (p) => (!category || p.category === category) && (!needle || `${p.name} ${p.description}`.toLowerCase().includes(needle)),
+      ),
+      categories: [...new Set(mock.products.map((p) => p.category))].sort(),
+    };
+  },
+  place: ({ items, deliveryMethod, note }: { items: CartLine[]; deliveryMethod: "pickup" | "delivery"; note: string }): Order => {
+    if (!items.length) throw new Error("Your cart is empty.");
+    const lines = items.map((line) => {
+      const p = mock.products.find((x) => x.id === line.productId);
+      if (!p || !p.inStock) throw new Error("One of the items in your cart is no longer for sale.");
+      if (p.maxQuantity !== null && line.quantity > p.maxQuantity) throw new Error(`You can order at most ${p.maxQuantity} of ${p.name}.`);
+      return { id: nextId++, productId: p.id, name: p.name, unit: p.unit, unitPrice: p.price, quantity: line.quantity, lineTotal: p.price * line.quantity };
+    });
+    const id = nextId++;
+    const order: Order = {
+      id,
+      orderNumber: `ORD-${String(id).padStart(6, "0")}`,
+      status: "awaiting_payment",
+      items: lines,
+      total: lines.reduce((n, l) => n + l.lineTotal, 0),
+      deliveryMethod,
+      note: note.trim() || null,
+      createdAt: new Date().toISOString(),
+      paidAt: null,
+      canUploadReceipt: true,
+      canCancel: true,
+      receipt: null,
+    };
+    storeStore.orders.unshift(order);
+    return order;
+  },
+  cancel: (id: number): Order => {
+    const order = storeStore.orders.find((o) => o.id === id);
+    if (!order || !order.canCancel) throw new Error("This order can't be cancelled.");
+    Object.assign(order, { status: "cancelled", canCancel: false, canUploadReceipt: false } satisfies Partial<Order>);
+    return order;
+  },
+  upload: (id: number, data: ReceiptUpload): Order => {
+    const order = storeStore.orders.find((o) => o.id === id);
+    if (!order || !order.canUploadReceipt) throw new Error("A receipt for this order is already waiting for confirmation.");
+    Object.assign(order, {
+      status: "payment_submitted",
+      canCancel: false,
+      canUploadReceipt: false,
+      receipt: {
+        id: nextId++,
+        status: "pending",
+        amount: data.amount,
+        paidOn: data.paidOn,
+        transferReference: data.transferReference.trim() || null,
+        fileName: "name" in data.file ? data.file.name : "receipt",
+        submittedAt: new Date().toISOString(),
+        reviewNote: null,
+      },
+    } satisfies Partial<Order>);
+    return order;
   },
 };
 
@@ -383,17 +462,33 @@ export const api = {
       ? request(`/resident/bills${status ? `?status=${status}` : ""}`)
       : delay(financeStore.bills.filter((b) => !status || (status === "paid") === (b.status === "paid"))),
   /** Sends a bank transfer receipt for a bill. Returns the updated bill ("Awaiting confirmation"). */
-  uploadReceipt: (billId: number, data: ReceiptUpload): Promise<Bill> => {
-    if (!API_URL) return delay(mockFinance.upload(billId, data));
-    const form = new FormData();
-    // React Native uploads a picked file from its uri.
-    form.append("receipt", data.file as unknown as Blob);
-    form.append("amount", String(data.amount));
-    form.append("paid_on", data.paidOn);
-    if (data.transferReference.trim()) form.append("transfer_reference", data.transferReference.trim());
-    return request(`/resident/bills/${billId}/receipts`, { method: "POST", body: form });
-  },
+  uploadReceipt: (billId: number, data: ReceiptUpload): Promise<Bill> =>
+    API_URL
+      ? request(`/resident/bills/${billId}/receipts`, { method: "POST", body: receiptForm(data) })
+      : delay(mockFinance.upload(billId, data)),
   getPayments: (): Promise<Payment[]> => (API_URL ? request("/resident/payments") : delay(mock.payments)),
+
+  // Store
+  getProducts: async (filters: { category?: string; q?: string } = {}): Promise<{ products: Product[]; categories: string[] }> => {
+    if (!API_URL) return delay(mockStore.products(filters));
+    const query = new URLSearchParams();
+    if (filters.category) query.set("category", filters.category);
+    if (filters.q?.trim()) query.set("q", filters.q.trim());
+    const qs = query.toString();
+    const res = await requestJson<{ data: Product[]; meta?: { categories?: string[] } }>(`/resident/store/products${qs ? `?${qs}` : ""}`);
+    return { products: res.data, categories: res.meta?.categories ?? [] };
+  },
+  placeOrder: (data: { items: CartLine[]; deliveryMethod: "pickup" | "delivery"; note: string }): Promise<Order> =>
+    API_URL
+      ? request("/resident/store/orders", { method: "POST", body: body({ ...data, note: data.note.trim() || null }) })
+      : delay(mockStore.place(data)),
+  getOrders: (): Promise<Order[]> => (API_URL ? request("/resident/store/orders") : delay(storeStore.orders)),
+  cancelOrder: (id: number): Promise<Order> =>
+    API_URL ? request(`/resident/store/orders/${id}/cancel`, { method: "POST" }) : delay(mockStore.cancel(id)),
+  uploadOrderReceipt: (id: number, data: ReceiptUpload): Promise<Order> =>
+    API_URL
+      ? request(`/resident/store/orders/${id}/receipts`, { method: "POST", body: receiptForm(data) })
+      : delay(mockStore.upload(id, data)),
 
   // Estate map
   getEstateMap: (): Promise<EstateMap> => (API_URL ? request("/estate/map") : delay(mock.estateMap)),

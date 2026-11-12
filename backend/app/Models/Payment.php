@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A payment made by a resident (service charge, dues, etc.).
  */
-#[Fillable(['user_id', 'bill_id', 'description', 'amount', 'method', 'paid_at'])]
+#[Fillable(['user_id', 'bill_id', 'order_id', 'description', 'amount', 'method', 'paid_at'])]
 class Payment extends Model
 {
     use HasFactory;
@@ -31,6 +31,11 @@ class Payment extends Model
     public function bill(): BelongsTo
     {
         return $this->belongsTo(Bill::class);
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 
     /**

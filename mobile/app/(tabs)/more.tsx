@@ -12,7 +12,7 @@ type Item = { label: string; icon: ComponentProps<typeof Feather>["name"]; href:
 
 const ITEMS: Item[] = [
   { label: "Finance", icon: "credit-card", href: "/finance" },
-  { label: "Store", icon: "shopping-bag", href: "/section/store" },
+  { label: "Store", icon: "shopping-bag", href: "/store" },
   { label: "Messages", icon: "mail", href: "/messages" },
   { label: "Settings", icon: "settings", href: "/profile?tab=settings" },
 ];

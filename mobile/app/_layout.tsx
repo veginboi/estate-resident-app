@@ -9,6 +9,7 @@ import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { colors, fonts } from "@/components/theme";
 import { SessionProvider, useSession } from "@/lib/session";
+import { CartProvider } from "@/lib/cart";
 import { UnreadProvider } from "@/lib/unread";
 
 function Splash() {
@@ -34,8 +35,10 @@ function RootStack() {
     >
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="section/[name]" options={{ title: "" }} />
         <Stack.Screen name="finance/index" options={{ title: "Finance" }} />
+        <Stack.Screen name="store/index" options={{ title: "Estate Store" }} />
+        <Stack.Screen name="store/cart" options={{ title: "Your cart" }} />
+        <Stack.Screen name="store/orders" options={{ title: "My orders" }} />
         <Stack.Screen name="messages/index" options={{ title: "Messages" }} />
         <Stack.Screen name="messages/[id]" options={{ title: "" }} />
         <Stack.Screen name="messages/new" options={{ title: "New chat", presentation: "modal" }} />
@@ -55,7 +58,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <SessionProvider>
-        <UnreadProvider>{fontsLoaded || fontError ? <RootStack /> : <Splash />}</UnreadProvider>
+        <UnreadProvider>
+          <CartProvider>{fontsLoaded || fontError ? <RootStack /> : <Splash />}</CartProvider>
+        </UnreadProvider>
       </SessionProvider>
     </SafeAreaProvider>
   );

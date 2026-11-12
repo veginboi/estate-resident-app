@@ -24,6 +24,7 @@ class PaymentResource extends JsonResource
             'method' => $this->method,
             'paidAt' => $this->paid_at->toIso8601String(),
             'bill' => $this->bill ? ['id' => $this->bill->id, 'title' => $this->bill->title] : null,
+            'order' => $this->order ? ['id' => $this->order->id, 'orderNumber' => $this->order->orderNumber()] : null,
         ];
     }
 }

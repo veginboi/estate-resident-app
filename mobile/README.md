@@ -47,7 +47,10 @@ Android Keystore via `expo-secure-store`.
 | Activity (family check-in/out, filter by day) | `app/(tabs)/activity.tsx` |
 | Estate map | `app/(tabs)/estate-map.tsx` |
 | Profile: About, Family Members, Properties, Settings | `app/(tabs)/profile.tsx`, `src/components/profile/` |
-| More: Finance, Store, Messages (placeholders), Settings, Logout | `app/(tabs)/more.tsx`, `app/section/[name].tsx` |
+| More: Finance, Store, Messages, Settings, Logout | `app/(tabs)/more.tsx` |
+| Finance: bills, receipt upload, payment history | `app/finance/index.tsx` |
+| Store: shop, cart, my orders | `app/store/index.tsx`, `cart.tsx`, `orders.tsx` |
+| Messages: chats, chat, new chat | `app/messages/index.tsx`, `[id].tsx`, `new.tsx` |
 
 The red **SOS** button in every screen's header (and "life under threat" on Home) sends the
 emergency alert after a confirmation.

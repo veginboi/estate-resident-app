@@ -4,8 +4,10 @@ namespace Database\Seeders;
 
 use App\Models\Conversation;
 use App\Models\EstateUpdate;
+use App\Models\Order;
 use App\Models\PaymentProof;
 use App\Models\Plot;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
@@ -81,6 +83,7 @@ class DemoEstateSeeder extends Seeder
         }
 
         $this->seedFinance($david);
+        $this->seedStore($david);
 
         EstateUpdate::create([
             'author' => 'Estate Admin',
@@ -91,6 +94,63 @@ class DemoEstateSeeder extends Seeder
 
         $neighbours = $this->seedMap($david);
         $this->seedChats($david, $neighbours);
+    }
+
+    private function seedStore(User $david): void
+    {
+        $products = collect([
+            ['Car sticker (2026)', 'Windscreen sticker that lets your car through the main gate. One per vehicle.', 'Access & Security', 5000, 'per car', null, 3],
+            ['Gate access tag', 'Contactless tag for the pedestrian gate. Replacement for lost tags.', 'Access & Security', 7500, 'per tag', null, 4],
+            ['Visitor pass booklet', '25 pre-signed visitor passes for regular guests and deliveries.', 'Access & Security', 2000, '25 passes', null, null],
+            ['Cooking gas refill', 'Refill delivered and connected by the estate gas vendor.', 'Home', 18000, '12.5 kg', null, 2],
+            ['Table water', 'Sachet water from the estate supplier.', 'Home', 600, 'per bag', 120, 20],
+            ['Waste bin (120 L)', 'Wheeled bin approved for estate waste collection.', 'Home', 25000, null, 4, 2],
+            ['Estate polo shirt', 'Green LincolnEstate polo for residents\' events. Sizes S to XXL.', 'Merchandise', 8000, null, 0, null],
+        ])->mapWithKeys(function (array $p, int $i) {
+            [$name, $description, $category, $price, $unit, $stock, $max] = $p;
+
+            return [$name => Product::create([
+                'name' => $name,
+                'description' => $description,
+                'category' => $category,
+                'price' => $price,
+                'unit' => $unit,
+                'stock' => $stock,
+                'max_per_order' => $max,
+                'sort_order' => $i,
+            ])];
+        });
+
+        $order = function (array $lines, array $attributes) use ($david, $products): Order {
+            $items = collect($lines)->map(fn (int $qty, string $name) => [
+                'product_id' => $products[$name]->id,
+                'name' => $name,
+                'unit' => $products[$name]->unit,
+                'unit_price' => $products[$name]->price,
+                'quantity' => $qty,
+                'line_total' => $products[$name]->price * $qty,
+            ])->values();
+            $order = $david->orders()->create([...$attributes, 'total' => $items->sum('line_total')]);
+            $order->items()->createMany($items->all());
+
+            return $order;
+        };
+
+        $done = $order(['Car sticker (2026)' => 2], ['delivery_method' => Order::PICKUP, 'fulfilment' => Order::COMPLETED, 'paid_at' => now()->subDays(20)]);
+        $done->forceFill(['created_at' => now()->subDays(21)])->save();
+        $david->payments()->create([
+            'order_id' => $done->id,
+            'description' => "Store order {$done->orderNumber()}",
+            'amount' => $done->total,
+            'method' => 'bank_transfer',
+            'paid_at' => $done->paid_at,
+        ]);
+
+        $order(['Cooking gas refill' => 1, 'Table water' => 4], [
+            'delivery_method' => Order::DELIVERY,
+            'note' => 'Please deliver after 4pm.',
+            'fulfilment' => Order::OPEN,
+        ]);
     }
 
     private function seedFinance(User $david): void

@@ -28,16 +28,7 @@ class BillResource extends JsonResource
             'status' => $status,
             'paidAt' => $this->paid_at?->toIso8601String(),
             'canUploadReceipt' => in_array($status, [Bill::UNPAID, Bill::OVERDUE], true),
-            'receipt' => $proof ? [
-                'id' => $proof->id,
-                'status' => $proof->status,
-                'amount' => (float) $proof->amount,
-                'paidOn' => $proof->paid_on->toDateString(),
-                'transferReference' => $proof->transfer_reference,
-                'fileName' => $proof->file_name,
-                'submittedAt' => $proof->created_at->toIso8601String(),
-                'reviewNote' => $proof->review_note,
-            ] : null,
+            'receipt' => $proof ? (new PaymentProofResource($proof))->resolve($request) : null,
         ];
     }
 }

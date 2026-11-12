@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Resident\ProfileController;
 use App\Http\Controllers\Api\Resident\PropertyController;
 use App\Http\Controllers\Api\Resident\ReminderController;
 use App\Http\Controllers\Api\Resident\SettingsController;
+use App\Http\Controllers\Api\Resident\StoreController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
@@ -64,6 +65,16 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('throttle:10,1');
         Route::get('/receipts/{proof}/file', [FinanceController::class, 'receiptFile'])->whereNumber('proof');
         Route::get('/payments', [FinanceController::class, 'payments']);
+
+        // Store: the estate shop
+        Route::get('/store/products', [StoreController::class, 'products']);
+        Route::get('/store/orders', [StoreController::class, 'orders']);
+        Route::post('/store/orders', [StoreController::class, 'placeOrder'])->middleware('throttle:10,1');
+        Route::get('/store/orders/{order}', [StoreController::class, 'order'])->whereNumber('order');
+        Route::post('/store/orders/{order}/cancel', [StoreController::class, 'cancel'])->whereNumber('order');
+        Route::post('/store/orders/{order}/receipts', [StoreController::class, 'uploadReceipt'])
+            ->whereNumber('order')
+            ->middleware('throttle:10,1');
     });
 
     Route::get('/estate/map', EstateMapController::class);

@@ -78,7 +78,7 @@ class FinanceController extends Controller
     public function payments(Request $request): AnonymousResourceCollection
     {
         $payments = $request->user()->payments()
-            ->with('bill:id,title')
+            ->with(['bill:id,title', 'order:id'])
             ->orderByDesc('paid_at')
             ->orderByDesc('id')
             ->limit(200)

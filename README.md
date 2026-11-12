@@ -32,8 +32,11 @@ The project has three parts that share one API:
   New messages arrive within a few seconds, and an unread badge shows on the Messages link.
   Residents who turn off "All Members Can Chat With Me" can't be messaged directly.
 - **Settings**: SMS and email notifications, chat preferences and password change
-
-The Store is a placeholder for now.
+- **Store**: the estate shop. Residents browse items the estate sells (car stickers, access
+  tags, gas refills, water and more) by category or search, and add them to a cart. They choose
+  pickup or delivery, then place the order. They pay by bank transfer and upload the receipt on
+  the order. They can follow it from awaiting payment to ready and completed, and cancel it
+  before paying.
 
 ## Project structure
 
@@ -138,6 +141,12 @@ All endpoints are under `/api`. Every endpoint except sign-up and login needs an
 | POST | `/resident/bills/{id}/receipts` | Multipart `receipt` (JPG, PNG or PDF, max 5 MB), `amount`, `paid_on`, `transfer_reference?` |
 | GET | `/resident/receipts/{id}/file` | Download a receipt the resident uploaded |
 | GET | `/resident/payments` | Payments the estate recorded, newest first, with receipt numbers |
+| GET | `/resident/store/products?category=&q=` | Products on sale, plus `meta.categories` |
+| POST | `/resident/store/orders` | `{items: [{productId, quantity}], deliveryMethod: pickup\|delivery, note?}`. Prices come from the server |
+| GET | `/resident/store/orders` | The resident's orders, newest first |
+| GET | `/resident/store/orders/{id}` | One order |
+| POST | `/resident/store/orders/{id}/cancel` | Cancel an unpaid order (stock is returned) |
+| POST | `/resident/store/orders/{id}/receipts` | Multipart transfer receipt, same fields as bills |
 | GET | `/resident/conversations` | The estate chatroom, then one-to-one chats, with last message and unread count |
 | POST | `/resident/conversations` | `{residentId}`, open (or start) a one-to-one chat |
 | GET | `/resident/conversations/unread` | `{count}`, total unread messages |
@@ -161,6 +170,12 @@ saved in `payment_proofs` with status `pending`. The admin side approves it, whi
 `paid_at` and records a `payments` row with `bill_id`. Or it rejects it, which sets the status to
 `rejected` and adds a `review_note` that the resident sees. Receipt files are stored on the
 private disk (`storage/app/private`) and are never publicly linkable.
+
+Store orders work the same way. Products and order fulfilment come from the admin side, which
+moves `orders.fulfilment` from `open` to `ready` to `completed` (or `cancelled`). Receipts for
+orders are in the same `payment_proofs` table, with `order_id` set instead of `bill_id`.
+Approving one sets the order's `paid_at` and records a `payments` row with `order_id`. Stock
+goes down when an order is placed and back up if the resident cancels it.
 
 Set the bank account residents pay into with `ESTATE_BANK_NAME`, `ESTATE_BANK_ACCOUNT_NAME` and
 `ESTATE_BANK_ACCOUNT_NUMBER` in `backend/.env`.
