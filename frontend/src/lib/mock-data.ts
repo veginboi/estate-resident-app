@@ -1,5 +1,7 @@
 import type {
   Activity,
+  BankDetails,
+  Bill,
   ChatMessage,
   ChatResident,
   DashboardData,
@@ -7,6 +9,7 @@ import type {
   FamilyMember,
   MapPlot,
   Neighbour,
+  Payment,
   Profile,
   Property,
   Settings,
@@ -167,4 +170,87 @@ export const chats: { id: number; residentId: number | null; lastReadId: number;
       msg(8, victor, "No problem, thank you!", 234),
     ],
   },
+];
+
+// ---- Finance ----
+
+const isoDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const monthDay = (monthOffset: number, day: number) => {
+  const now = new Date();
+  return isoDate(new Date(now.getFullYear(), now.getMonth() + monthOffset, day));
+};
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+
+export const bank: BankDetails = { bankName: "Zenith Bank", accountName: "LincolnEstate Residents Association", accountNumber: "1012345678" };
+
+export const bills: Bill[] = [
+  {
+    id: 1,
+    title: "Security levy (Q4)",
+    description: "Quarterly contribution to the estate security team and CCTV maintenance.",
+    amount: 15000,
+    dueDate: monthDay(0, 0),
+    status: "overdue",
+    paidAt: null,
+    canUploadReceipt: true,
+    receipt: null,
+  },
+  {
+    id: 2,
+    title: "Waste collection (November)",
+    description: null,
+    amount: 3500,
+    dueDate: monthDay(0, 20),
+    status: "pending",
+    paidAt: null,
+    canUploadReceipt: false,
+    receipt: {
+      id: 1,
+      status: "pending",
+      amount: 3500,
+      paidOn: isoDate(new Date(Date.now() - 86_400_000)),
+      transferReference: "TRF20261111093",
+      fileName: "transfer-receipt.jpg",
+      submittedAt: daysAgo(1),
+      reviewNote: null,
+    },
+  },
+  {
+    id: 3,
+    title: "Road repairs levy",
+    description: "One-off levy for resurfacing Central Close, agreed at the October residents' meeting.",
+    amount: 25000,
+    dueDate: monthDay(1, 5),
+    status: "unpaid",
+    paidAt: null,
+    canUploadReceipt: true,
+    receipt: null,
+  },
+  {
+    id: 4,
+    title: "Service charge (November)",
+    description: null,
+    amount: 10000,
+    dueDate: monthDay(0, 15),
+    status: "paid",
+    paidAt: daysAgo(3),
+    canUploadReceipt: false,
+    receipt: null,
+  },
+  {
+    id: 5,
+    title: "Service charge (October)",
+    description: null,
+    amount: 10000,
+    dueDate: monthDay(-1, 15),
+    status: "paid",
+    paidAt: daysAgo(31),
+    canUploadReceipt: false,
+    receipt: null,
+  },
+];
+
+export const payments: Payment[] = [
+  { id: 2, receiptNumber: "LE-000002", description: "Service charge (November)", amount: 10000, method: "bank_transfer", paidAt: daysAgo(3), bill: { id: 4, title: "Service charge (November)" } },
+  { id: 1, receiptNumber: "LE-000001", description: "Service charge (October)", amount: 10000, method: "bank_transfer", paidAt: daysAgo(31), bill: { id: 5, title: "Service charge (October)" } },
 ];

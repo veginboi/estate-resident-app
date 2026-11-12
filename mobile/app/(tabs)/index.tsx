@@ -57,7 +57,7 @@ export default function DashboardScreen() {
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
       <StatCard icon="users" value={String(stats.neighbors)} label="Neighbors" href="/estate-map" />
-      <StatCard icon="credit-card" value={`NGN ${stats.totalPayments.toLocaleString("en-NG")}`} label="Total Payment Made" href="/section/finance" />
+      <StatCard icon="credit-card" value={`NGN ${stats.totalPayments.toLocaleString("en-NG")}`} label="Total Payment Made" href="/finance" />
       <StatCard icon="log-out" value={String(stats.familyActivities)} label="Family Activities" href="/activity" />
 
       {/* Reminders */}

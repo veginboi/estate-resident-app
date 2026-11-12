@@ -35,6 +35,7 @@ function RootStack() {
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="section/[name]" options={{ title: "" }} />
+        <Stack.Screen name="finance/index" options={{ title: "Finance" }} />
         <Stack.Screen name="messages/index" options={{ title: "Messages" }} />
         <Stack.Screen name="messages/[id]" options={{ title: "" }} />
         <Stack.Screen name="messages/new" options={{ title: "New chat", presentation: "modal" }} />

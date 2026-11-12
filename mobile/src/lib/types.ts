@@ -117,3 +117,61 @@ export interface Neighbour {
   residentCode: string;
   plot: string | null;
 }
+
+export type BillStatus = "unpaid" | "overdue" | "pending" | "paid";
+
+export interface BillReceipt {
+  id: number;
+  status: "pending" | "approved" | "rejected";
+  amount: number;
+  paidOn: string; // YYYY-MM-DD
+  transferReference: string | null;
+  fileName: string;
+  submittedAt: string; // ISO 8601
+  reviewNote: string | null; // why the estate rejected it
+}
+
+export interface Bill {
+  id: number;
+  title: string;
+  description: string | null;
+  amount: number;
+  dueDate: string; // YYYY-MM-DD
+  status: BillStatus;
+  paidAt: string | null;
+  canUploadReceipt: boolean;
+  receipt: BillReceipt | null; // the latest receipt uploaded for this bill
+}
+
+export interface Payment {
+  id: number;
+  receiptNumber: string; // e.g. LE-000042
+  description: string;
+  amount: number;
+  method: string | null; // e.g. bank_transfer
+  paidAt: string; // ISO 8601
+  bill: { id: number; title: string } | null;
+}
+
+export interface BankDetails {
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+}
+
+export interface FinanceSummary {
+  outstanding: number;
+  openBills: number;
+  overdueBills: number;
+  awaitingConfirmation: number;
+  paidThisYear: number;
+  totalPaid: number;
+  bank: BankDetails | null; // null until the estate adds its account
+}
+
+export interface ReceiptUpload {
+  file: File | { uri: string; name: string; type: string }; // a browser File, or a picked file on mobile
+  amount: number;
+  paidOn: string; // YYYY-MM-DD
+  transferReference: string;
+}

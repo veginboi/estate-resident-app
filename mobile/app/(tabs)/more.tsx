@@ -11,7 +11,7 @@ import { useSession } from "@/lib/session";
 type Item = { label: string; icon: ComponentProps<typeof Feather>["name"]; href: Href; badge?: number };
 
 const ITEMS: Item[] = [
-  { label: "Finance", icon: "credit-card", href: "/section/finance" },
+  { label: "Finance", icon: "credit-card", href: "/finance" },
   { label: "Store", icon: "shopping-bag", href: "/section/store" },
   { label: "Messages", icon: "mail", href: "/messages" },
   { label: "Settings", icon: "settings", href: "/profile?tab=settings" },

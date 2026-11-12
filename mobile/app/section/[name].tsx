@@ -4,10 +4,9 @@ import { View } from "react-native";
 import { colors } from "@/components/theme";
 import { Card, Screen, Txt } from "@/components/ui";
 
-// Finance and Store aren't part of the current Resident App tasks.
-// This placeholder keeps their links working until they're built.
-const SECTIONS: Record<string, { title: string; icon: "credit-card" | "shopping-bag" }> = {
-  finance: { title: "Finance", icon: "credit-card" },
+// The Store isn't part of the current Resident App tasks.
+// This placeholder keeps its link working until it's built.
+const SECTIONS: Record<string, { title: string; icon: "shopping-bag" }> = {
   store: { title: "Store", icon: "shopping-bag" },
 };
 

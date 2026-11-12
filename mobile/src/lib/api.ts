@@ -3,14 +3,18 @@ import { Platform } from "react-native";
 import * as mock from "./mock-data";
 import type {
   Activity,
+  Bill,
   ChatMessage,
   Conversation,
   DashboardData,
   EstateMap,
   FamilyMember,
+  FinanceSummary,
   Neighbour,
+  Payment,
   Profile,
   Property,
+  ReceiptUpload,
   Settings,
 } from "./types";
 
@@ -70,7 +74,8 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
       ...init,
       headers: {
         Accept: "application/json",
-        "Content-Type": "application/json",
+        // Let fetch set the multipart boundary for file uploads.
+        ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },
@@ -106,6 +111,44 @@ let nextId = 100;
 const delay = <T,>(value: T) => new Promise<T>((r) => setTimeout(() => r(clone(value)), 200));
 
 export const isMockMode = !API_URL;
+
+// In-memory bills for mock mode.
+const financeStore = { bills: clone(mock.bills) };
+const mockFinance = {
+  summary: (): FinanceSummary => {
+    const open = financeStore.bills.filter((b) => b.status !== "paid");
+    const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+    return {
+      outstanding: open.reduce((n, b) => n + b.amount, 0),
+      openBills: open.length,
+      overdueBills: open.filter((b) => b.status === "overdue").length,
+      awaitingConfirmation: open.filter((b) => b.status === "pending").length,
+      paidThisYear: mock.payments.filter((p) => p.paidAt >= yearStart).reduce((n, p) => n + p.amount, 0),
+      totalPaid: mock.payments.reduce((n, p) => n + p.amount, 0),
+      bank: mock.bank,
+    };
+  },
+  upload: (billId: number, data: ReceiptUpload): Bill => {
+    const bill = financeStore.bills.find((b) => b.id === billId);
+    if (!bill) throw new Error("This bill doesn't exist.");
+    if (!bill.canUploadReceipt) throw new Error("A receipt for this bill is already waiting for confirmation.");
+    Object.assign(bill, {
+      status: "pending",
+      canUploadReceipt: false,
+      receipt: {
+        id: nextId++,
+        status: "pending",
+        amount: data.amount,
+        paidOn: data.paidOn,
+        transferReference: data.transferReference.trim() || null,
+        fileName: "name" in data.file ? data.file.name : "receipt",
+        submittedAt: new Date().toISOString(),
+        reviewNote: null,
+      },
+    } satisfies Partial<Bill>);
+    return bill;
+  },
+};
 
 // In-memory chats for mock mode.
 const chatStore = clone(mock.chats);
@@ -332,6 +375,25 @@ export const api = {
     const needle = q.trim().toLowerCase();
     return delay(mock.neighbours.filter((n) => !needle || `${n.name} ${n.residentCode}`.toLowerCase().includes(needle)));
   },
+
+  // Finance
+  getFinanceSummary: (): Promise<FinanceSummary> => (API_URL ? request("/resident/finance") : delay(mockFinance.summary())),
+  getBills: (status?: "open" | "paid"): Promise<Bill[]> =>
+    API_URL
+      ? request(`/resident/bills${status ? `?status=${status}` : ""}`)
+      : delay(financeStore.bills.filter((b) => !status || (status === "paid") === (b.status === "paid"))),
+  /** Sends a bank transfer receipt for a bill. Returns the updated bill ("Awaiting confirmation"). */
+  uploadReceipt: (billId: number, data: ReceiptUpload): Promise<Bill> => {
+    if (!API_URL) return delay(mockFinance.upload(billId, data));
+    const form = new FormData();
+    // React Native uploads a picked file from its uri.
+    form.append("receipt", data.file as unknown as Blob);
+    form.append("amount", String(data.amount));
+    form.append("paid_on", data.paidOn);
+    if (data.transferReference.trim()) form.append("transfer_reference", data.transferReference.trim());
+    return request(`/resident/bills/${billId}/receipts`, { method: "POST", body: form });
+  },
+  getPayments: (): Promise<Payment[]> => (API_URL ? request("/resident/payments") : delay(mock.payments)),
 
   // Estate map
   getEstateMap: (): Promise<EstateMap> => (API_URL ? request("/estate/map") : delay(mock.estateMap)),

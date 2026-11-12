@@ -25,12 +25,15 @@ The project has three parts that share one API:
 - **Properties**: register and manage your vehicles and other property
 - **Activity**: family gate check-ins and check-outs, which you can filter by day
 - **Estate map**: an interactive map of plots and roads in the estate
+- **Finance**: bills and dues from the estate (unpaid, overdue, awaiting confirmation, paid),
+  totals owed and paid, the estate's bank details, and payment history with printable receipts.
+  Residents pay by bank transfer and upload the transfer receipt (photo or PDF) on the bill.
 - **Messages**: an estate chatroom for all residents, plus one-to-one chats with neighbours.
   New messages arrive within a few seconds, and an unread badge shows on the Messages link.
   Residents who turn off "All Members Can Chat With Me" can't be messaged directly.
 - **Settings**: SMS and email notifications, chat preferences and password change
 
-Finance and Store are placeholders for now.
+The Store is a placeholder for now.
 
 ## Project structure
 
@@ -129,6 +132,12 @@ All endpoints are under `/api`. Every endpoint except sign-up and login needs an
 | GET / PUT | `/resident/settings` | `{smsNotifications, emailNotifications, allowChat}` |
 | PUT | `/resident/password` | `{current_password, password, password_confirmation}` |
 | POST | `/resident/emergency-alerts` | Send an emergency alert |
+| GET | `/resident/finance` | Amount outstanding, overdue and pending counts, amount paid, and the estate's bank details |
+| GET | `/resident/bills?status=open\|paid` | Bills, unpaid ones first, each with its latest receipt |
+| GET | `/resident/bills/{id}` | One bill |
+| POST | `/resident/bills/{id}/receipts` | Multipart `receipt` (JPG, PNG or PDF, max 5 MB), `amount`, `paid_on`, `transfer_reference?` |
+| GET | `/resident/receipts/{id}/file` | Download a receipt the resident uploaded |
+| GET | `/resident/payments` | Payments the estate recorded, newest first, with receipt numbers |
 | GET | `/resident/conversations` | The estate chatroom, then one-to-one chats, with last message and unread count |
 | POST | `/resident/conversations` | `{residentId}`, open (or start) a one-to-one chat |
 | GET | `/resident/conversations/unread` | `{count}`, total unread messages |
@@ -146,8 +155,15 @@ The apps check for new messages every 4 seconds while a chat is open, every 10 s
 chat list, and every 30 seconds for the unread badge. They stop checking while the tab or app is
 in the background.
 
-Gate activity, estate updates, payments and map plots are read-only in this app. The admin and
-security parts of the system write them.
+Gate activity, estate updates, bills, payments and map plots are read-only in this app. The admin
+and security parts of the system write them. When a resident uploads a transfer receipt, it's
+saved in `payment_proofs` with status `pending`. The admin side approves it, which sets the bill's
+`paid_at` and records a `payments` row with `bill_id`. Or it rejects it, which sets the status to
+`rejected` and adds a `review_note` that the resident sees. Receipt files are stored on the
+private disk (`storage/app/private`) and are never publicly linkable.
+
+Set the bank account residents pay into with `ESTATE_BANK_NAME`, `ESTATE_BANK_ACCOUNT_NAME` and
+`ESTATE_BANK_ACCOUNT_NUMBER` in `backend/.env`.
 
 ## Testing
 

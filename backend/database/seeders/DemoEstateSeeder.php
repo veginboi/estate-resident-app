@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Conversation;
 use App\Models\EstateUpdate;
+use App\Models\PaymentProof;
 use App\Models\Plot;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -79,10 +80,7 @@ class DemoEstateSeeder extends Seeder
             ]);
         }
 
-        $david->payments()->createMany([
-            ['description' => 'Service charge (October)', 'amount' => 10000, 'paid_at' => now()->subMonth()],
-            ['description' => 'Service charge (November)', 'amount' => 10000, 'paid_at' => now()->subDays(3)],
-        ]);
+        $this->seedFinance($david);
 
         EstateUpdate::create([
             'author' => 'Estate Admin',
@@ -93,6 +91,60 @@ class DemoEstateSeeder extends Seeder
 
         $neighbours = $this->seedMap($david);
         $this->seedChats($david, $neighbours);
+    }
+
+    private function seedFinance(User $david): void
+    {
+        $month = today()->startOfMonth();
+
+        // Paid bills, each with the payment the estate recorded for it.
+        foreach ([
+            ['Service charge (October)', $month->copy()->subMonth()->addDays(14), now()->subMonth()],
+            ['Service charge (November)', $month->copy()->addDays(14), now()->subDays(3)],
+        ] as [$title, $due, $paidAt]) {
+            $bill = $david->bills()->create(['title' => $title, 'amount' => 10000, 'due_date' => $due, 'paid_at' => $paidAt]);
+            $david->payments()->create([
+                'bill_id' => $bill->id,
+                'description' => $title,
+                'amount' => 10000,
+                'method' => 'bank_transfer',
+                'paid_at' => $paidAt,
+            ]);
+        }
+
+        $david->bills()->create([
+            'title' => 'Security levy (Q4)',
+            'description' => 'Quarterly contribution to the estate security team and CCTV maintenance.',
+            'amount' => 15000,
+            'due_date' => $month->copy()->subDays(1),
+        ]);
+
+        $david->bills()->create([
+            'title' => 'Road repairs levy',
+            'description' => 'One-off levy for resurfacing Central Close, agreed at the October residents\' meeting.',
+            'amount' => 25000,
+            'due_date' => $month->copy()->addMonth()->addDays(4),
+        ]);
+
+        // A bill with a transfer receipt waiting for the estate to confirm it.
+        $waste = $david->bills()->create([
+            'title' => 'Waste collection (November)',
+            'amount' => 3500,
+            'due_date' => $month->copy()->addDays(19),
+        ]);
+        $path = "payment-proofs/{$david->id}/demo-transfer-receipt.jpg";
+        Storage::disk('local')->put($path, file_get_contents(__DIR__.'/images/news.jpg'));
+        $waste->proofs()->create([
+            'user_id' => $david->id,
+            'amount' => 3500,
+            'paid_on' => today()->subDay(),
+            'transfer_reference' => 'TRF20261111093',
+            'file_path' => $path,
+            'file_name' => 'transfer-receipt.jpg',
+            'file_mime' => 'image/jpeg',
+            'file_size' => Storage::disk('local')->size($path),
+            'status' => PaymentProof::PENDING,
+        ]);
     }
 
     /**

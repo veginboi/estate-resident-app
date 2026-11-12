@@ -14,6 +14,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Bank account for bills
+    |--------------------------------------------------------------------------
+    |
+    | Residents pay bills by bank transfer to this account, then upload the
+    | transfer receipt in the app.
+    |
+    */
+
+    'bank' => [
+        'name' => env('ESTATE_BANK_NAME', ''),
+        'account_name' => env('ESTATE_BANK_ACCOUNT_NAME', ''),
+        'account_number' => env('ESTATE_BANK_ACCOUNT_NUMBER', ''),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Estate map
     |--------------------------------------------------------------------------
     |

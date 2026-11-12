@@ -7,9 +7,11 @@ use App\Http\Controllers\Api\Resident\ConversationController;
 use App\Http\Controllers\Api\Resident\DashboardController;
 use App\Http\Controllers\Api\Resident\EmergencyAlertController;
 use App\Http\Controllers\Api\Resident\FamilyMemberController;
+use App\Http\Controllers\Api\Resident\FinanceController;
 use App\Http\Controllers\Api\Resident\MessageController;
 use App\Http\Controllers\Api\Resident\NeighbourController;
 use App\Http\Controllers\Api\Resident\PasswordController;
+use App\Http\Controllers\Api\Resident\PaymentProofController;
 use App\Http\Controllers\Api\Resident\ProfileController;
 use App\Http\Controllers\Api\Resident\PropertyController;
 use App\Http\Controllers\Api\Resident\ReminderController;
@@ -52,6 +54,16 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('conversation')
             ->middleware('throttle:30,1');
         Route::get('/neighbours', NeighbourController::class);
+
+        // Finance: bills, bank transfer receipts and payment history
+        Route::get('/finance', [FinanceController::class, 'summary']);
+        Route::get('/bills', [FinanceController::class, 'bills']);
+        Route::get('/bills/{bill}', [FinanceController::class, 'bill'])->whereNumber('bill');
+        Route::post('/bills/{bill}/receipts', [PaymentProofController::class, 'store'])
+            ->whereNumber('bill')
+            ->middleware('throttle:10,1');
+        Route::get('/receipts/{proof}/file', [FinanceController::class, 'receiptFile'])->whereNumber('proof');
+        Route::get('/payments', [FinanceController::class, 'payments']);
     });
 
     Route::get('/estate/map', EstateMapController::class);

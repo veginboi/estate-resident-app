@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A payment made by a resident (service charge, dues, etc.).
  */
-#[Fillable(['user_id', 'description', 'amount', 'paid_at'])]
+#[Fillable(['user_id', 'bill_id', 'description', 'amount', 'method', 'paid_at'])]
 class Payment extends Model
 {
     use HasFactory;
@@ -26,5 +26,18 @@ class Payment extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function bill(): BelongsTo
+    {
+        return $this->belongsTo(Bill::class);
+    }
+
+    /**
+     * The receipt number shown to residents, e.g. "LE-000042".
+     */
+    public function receiptNumber(): string
+    {
+        return 'LE-'.str_pad((string) $this->id, 6, '0', STR_PAD_LEFT);
     }
 }
