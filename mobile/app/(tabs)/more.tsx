@@ -5,6 +5,7 @@ import { Pressable, View } from "react-native";
 import { colors } from "@/components/theme";
 import { Card, Screen, Txt } from "@/components/ui";
 import { isMockMode } from "@/lib/api";
+import { useUnread } from "@/lib/unread";
 import { useSession } from "@/lib/session";
 
 type Item = { label: string; icon: ComponentProps<typeof Feather>["name"]; href: Href; badge?: number };
@@ -12,7 +13,7 @@ type Item = { label: string; icon: ComponentProps<typeof Feather>["name"]; href:
 const ITEMS: Item[] = [
   { label: "Finance", icon: "credit-card", href: "/section/finance" },
   { label: "Store", icon: "shopping-bag", href: "/section/store" },
-  { label: "Messages", icon: "mail", href: "/section/messages", badge: 6 },
+  { label: "Messages", icon: "mail", href: "/messages" },
   { label: "Settings", icon: "settings", href: "/profile?tab=settings" },
 ];
 
@@ -35,7 +36,7 @@ function Row({ label, icon, onPress, badge, color = colors.ink, last }: { label:
       {badge ? (
         <View style={{ backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 7, minWidth: 20, alignItems: "center" }}>
           <Txt weight="semibold" style={{ color: colors.white, fontSize: 11 }}>
-            {badge}
+            {badge > 99 ? "99+" : badge}
           </Txt>
         </View>
       ) : null}
@@ -47,12 +48,13 @@ function Row({ label, icon, onPress, badge, color = colors.ink, last }: { label:
 export default function MoreScreen() {
   const router = useRouter();
   const { signOut } = useSession();
+  const unread = useUnread();
 
   return (
     <Screen>
       <Card style={{ overflow: "hidden" }}>
         {ITEMS.map((item, i) => (
-          <Row key={item.label} {...item} onPress={() => router.push(item.href)} last={i === ITEMS.length - 1} />
+          <Row key={item.label} {...item} badge={item.href === "/messages" ? unread.count : item.badge} onPress={() => router.push(item.href)} last={i === ITEMS.length - 1} />
         ))}
       </Card>
 

@@ -15,6 +15,7 @@ abstract class TestCase extends BaseTestCase
         $user ??= User::factory()->create();
 
         $this->withToken($user->createToken('test')->plainTextToken);
+        $this->app['auth']->forgetGuards(); // so a test can switch residents between requests
 
         return $user;
     }

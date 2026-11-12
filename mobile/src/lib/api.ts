@@ -3,9 +3,12 @@ import { Platform } from "react-native";
 import * as mock from "./mock-data";
 import type {
   Activity,
+  ChatMessage,
+  Conversation,
   DashboardData,
   EstateMap,
   FamilyMember,
+  Neighbour,
   Profile,
   Property,
   Settings,
@@ -54,6 +57,12 @@ export const setUnauthorizedHandler = (handler: () => void) => {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const json = await requestJson<{ data?: T } & T>(path, init);
+  return (json?.data ?? json) as T; // Laravel API resources wrap payloads in `data`
+}
+
+/** Like request(), but returns the whole JSON body (for responses with `meta`). */
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await tokenStore.get();
   let res: Response;
   try {
@@ -80,8 +89,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(firstError ?? body?.message ?? `Request failed (${res.status})`);
   }
   if (res.status === 204) return undefined as T;
-  const json = await res.json();
-  return (json.data ?? json) as T; // Laravel API resources wrap payloads in `data`
+  return (await res.json()) as T;
 }
 
 const body = (data: unknown) => JSON.stringify(data);
@@ -98,6 +106,56 @@ let nextId = 100;
 const delay = <T,>(value: T) => new Promise<T>((r) => setTimeout(() => r(clone(value)), 200));
 
 export const isMockMode = !API_URL;
+
+// In-memory chats for mock mode.
+const chatStore = clone(mock.chats);
+const mockChat = {
+  list: (includeEmpty = false): Conversation[] =>
+    chatStore
+      .filter((c) => includeEmpty || c.residentId === null || c.messages.length > 0)
+      .map((c): Conversation => {
+        const last = c.messages.at(-1);
+        return {
+          id: c.id,
+          type: c.residentId === null ? "estate" : "direct",
+          title: c.residentId === null ? "LincolnEstate Chatroom" : mock.chatResidents[c.residentId].name,
+          resident: c.residentId === null ? null : mock.chatResidents[c.residentId],
+          lastMessage: last ? { body: last.body, createdAt: last.createdAt, senderName: last.sender.name, mine: last.mine } : null,
+          unreadCount: c.messages.filter((m) => !m.mine && m.id > c.lastReadId).length,
+        };
+      })
+      .sort((a, b) => (a.type === "estate" ? -1 : b.type === "estate" ? 1 : (b.lastMessage?.createdAt ?? "").localeCompare(a.lastMessage?.createdAt ?? ""))),
+  start: (residentId: number): Conversation => {
+    let chat = chatStore.find((c) => c.residentId === residentId);
+    if (!chat) {
+      chat = { id: nextId++, residentId, lastReadId: 0, messages: [] };
+      chatStore.push(chat);
+    }
+    return mockChat.list(true).find((c) => c.id === chat.id)!;
+  },
+  messages: (id: number, { after, before }: { after?: number; before?: number }) => {
+    const chat = chatStore.find((c) => c.id === id);
+    if (!chat) throw new Error("This chat doesn't exist.");
+    const list = chat.messages.filter((m) => (after === undefined || m.id > after) && (before === undefined || m.id < before));
+    if (before === undefined && list.length) chat.lastReadId = Math.max(chat.lastReadId, list.at(-1)!.id);
+    return { messages: list, hasMore: false };
+  },
+  send: (id: number, text: string): ChatMessage => {
+    const chat = chatStore.find((c) => c.id === id);
+    if (!chat) throw new Error("This chat doesn't exist.");
+    const message: ChatMessage = {
+      id: nextId++,
+      body: text.trim(),
+      createdAt: new Date().toISOString(),
+      sender: { id: mock.profile.id, name: mock.profile.name },
+      mine: true,
+    };
+    chat.messages.push(message);
+    chat.lastReadId = message.id;
+    return message;
+  },
+};
+
 
 /** Turns an image path from the API (or the sample data) into something <Image> can show. */
 const BUNDLED_IMAGES: Record<string, number> = {
@@ -233,6 +291,47 @@ export const api = {
           }),
         })
       : delay(undefined),
+
+  // Messages
+  getConversations: (): Promise<Conversation[]> =>
+    API_URL ? request("/resident/conversations") : delay(mockChat.list()),
+  getConversation: (id: number): Promise<Conversation> => {
+    if (API_URL) return request(`/resident/conversations/${id}`);
+    const found = mockChat.list(true).find((c) => c.id === id);
+    return found ? delay(found) : Promise.reject(new Error("This chat doesn't exist."));
+  },
+  /** Opens the one-to-one chat with a neighbour, starting it if needed. */
+  startConversation: (residentId: number): Promise<Conversation> =>
+    API_URL
+      ? request("/resident/conversations", { method: "POST", body: body({ residentId }) })
+      : delay(mockChat.start(residentId)),
+  /** Latest messages, or only newer (`after`) / older (`before`) ones. Loading the latest marks them read. */
+  getMessages: async (id: number, opts: { after?: number; before?: number } = {}): Promise<{ messages: ChatMessage[]; hasMore: boolean }> => {
+    if (!API_URL) return delay(mockChat.messages(id, opts));
+    const query = new URLSearchParams();
+    if (opts.after !== undefined) query.set("after", String(opts.after));
+    if (opts.before !== undefined) query.set("before", String(opts.before));
+    const qs = query.toString();
+    const res = await requestJson<{ data: ChatMessage[]; meta?: { hasMore?: boolean } }>(
+      `/resident/conversations/${id}/messages${qs ? `?${qs}` : ""}`,
+    );
+    return { messages: res.data, hasMore: !!res.meta?.hasMore };
+  },
+  sendMessage: (id: number, text: string): Promise<ChatMessage> =>
+    API_URL
+      ? request(`/resident/conversations/${id}/messages`, { method: "POST", body: body({ body: text }) })
+      : delay(mockChat.send(id, text)),
+  getUnreadCount: async (): Promise<number> => {
+    if (!API_URL) return mockChat.list().reduce((n, c) => n + c.unreadCount, 0);
+    const res = await request<{ count: number }>("/resident/conversations/unread");
+    return res.count;
+  },
+  /** Residents who accept messages, optionally filtered by name or resident code. */
+  getNeighbours: (q = ""): Promise<Neighbour[]> => {
+    if (API_URL) return request(`/resident/neighbours${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`);
+    const needle = q.trim().toLowerCase();
+    return delay(mock.neighbours.filter((n) => !needle || `${n.name} ${n.residentCode}`.toLowerCase().includes(needle)));
+  },
 
   // Estate map
   getEstateMap: (): Promise<EstateMap> => (API_URL ? request("/estate/map") : delay(mock.estateMap)),

@@ -1,9 +1,12 @@
 import type {
   Activity,
+  ChatMessage,
+  ChatResident,
   DashboardData,
   EstateMap,
   FamilyMember,
   MapPlot,
+  Neighbour,
   Profile,
   Property,
   Settings,
@@ -112,3 +115,57 @@ export const estateMap: EstateMap = {
     return owners[plot.id] ? { ...plot, owner: owners[plot.id] } : plot;
   }),
 };
+
+// ---- Messages ----
+
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+const me = { id: profile.id, name: profile.name };
+const andrew = { id: 2, name: "Mr. Esele Andrew" };
+const victor = { id: 3, name: "Mr. Victor Aguh" };
+const iroha = { id: 4, name: "Mr. Iroha .C" };
+const bola = { id: 5, name: "Mrs. Bola Ade" };
+
+export const neighbours: Neighbour[] = [
+  { id: bola.id, name: bola.name, residentCode: "EHN302", plot: "C2" },
+  { id: andrew.id, name: andrew.name, residentCode: "EHN102", plot: "A2" },
+  { id: iroha.id, name: iroha.name, residentCode: "EHN203", plot: "B3" },
+  { id: victor.id, name: victor.name, residentCode: "EHN107", plot: "A7" },
+];
+
+export const chatResidents: Record<number, ChatResident> = Object.fromEntries(
+  neighbours.map((n) => [n.id, { id: n.id, name: n.name, residentCode: n.residentCode, acceptsMessages: true }]),
+);
+
+const msg = (id: number, sender: { id: number; name: string }, body: string, ago: number): ChatMessage => ({
+  id,
+  body,
+  createdAt: minutesAgo(ago),
+  sender,
+  mine: sender.id === me.id,
+});
+
+/** Messages per chat. Chat 1 is the estate chatroom; the others are direct chats keyed by id. */
+export const chats: { id: number; residentId: number | null; lastReadId: number; messages: ChatMessage[] }[] = [
+  {
+    id: 1,
+    residentId: null,
+    lastReadId: 3,
+    messages: [
+      msg(1, andrew, "Good morning everyone. Has anyone else lost water pressure on Main Avenue?", 300),
+      msg(2, bola, "Yes, since about 7am. The estate office says maintenance ends at 2pm.", 294),
+      msg(3, me, "Thanks Bola. Our tank is full if anyone on Block B needs a few buckets.", 285),
+      msg(4, iroha, "Reminder: residents' meeting at the clubhouse on Saturday, 4pm.", 160),
+      msg(5, victor, "Please slow down on Central Close, children play there in the evenings.", 50),
+    ],
+  },
+  {
+    id: 2,
+    residentId: victor.id,
+    lastReadId: 7,
+    messages: [
+      msg(6, victor, "Hi David, is the red Lexus FCT0023JB yours? It's blocking my gate a little.", 240),
+      msg(7, me, "Sorry Victor, moving it now.", 236),
+      msg(8, victor, "No problem, thank you!", 234),
+    ],
+  },
+];

@@ -86,3 +86,34 @@ export interface EstateMap {
   roads: { x: number; y: number; w: number; h: number; name?: string }[];
   plots: MapPlot[];
 }
+
+export interface ChatResident {
+  id: number;
+  name: string;
+  residentCode: string;
+  acceptsMessages: boolean;
+}
+
+export interface Conversation {
+  id: number;
+  type: "estate" | "direct";
+  title: string; // "LincolnEstate Chatroom" or the other resident's name
+  resident: ChatResident | null; // the other resident in a direct chat
+  lastMessage: { body: string; createdAt: string; senderName: string; mine: boolean } | null;
+  unreadCount: number;
+}
+
+export interface ChatMessage {
+  id: number;
+  body: string;
+  createdAt: string; // ISO 8601
+  sender: { id: number; name: string };
+  mine: boolean;
+}
+
+export interface Neighbour {
+  id: number;
+  name: string;
+  residentCode: string;
+  plot: string | null;
+}

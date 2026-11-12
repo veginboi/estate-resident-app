@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Conversation;
 use App\Models\EstateUpdate;
 use App\Models\Plot;
 use App\Models\User;
@@ -90,10 +91,48 @@ class DemoEstateSeeder extends Seeder
             'published_at' => $today->copy()->setTime(12, 30),
         ]);
 
-        $this->seedMap($david);
+        $neighbours = $this->seedMap($david);
+        $this->seedChats($david, $neighbours);
     }
 
-    private function seedMap(User $david): void
+    /**
+     * @param  array<string, User>  $neighbours
+     */
+    private function seedChats(User $david, array $neighbours): void
+    {
+        $room = Conversation::estateRoom();
+        $start = now()->subHours(5);
+
+        foreach ([
+            [$neighbours['A2'], 'Good morning everyone. Has anyone else lost water pressure on Main Avenue?', 0],
+            [$neighbours['C2'], 'Yes, since about 7am. The estate office says maintenance ends at 2pm.', 6],
+            [$david, 'Thanks Bola. Our tank is full if anyone on Block B needs a few buckets.', 15],
+            [$neighbours['B3'], 'Reminder: residents\' meeting at the clubhouse on Saturday, 4pm.', 140],
+            [$neighbours['A7'], 'Please slow down on Central Close, children play there in the evenings.', 250],
+        ] as [$sender, $body, $minutes]) {
+            $room->messages()->create(['user_id' => $sender->id, 'body' => $body])
+                ->forceFill(['created_at' => $start->copy()->addMinutes($minutes), 'updated_at' => $start->copy()->addMinutes($minutes)])
+                ->save();
+        }
+        // David has read everything up to his own message.
+        $room->addParticipant($david->id, $room->messages()->where('user_id', $david->id)->max('id'));
+
+        $chat = Conversation::between($david, $neighbours['A7']);
+        foreach ([
+            [$neighbours['A7'], 'Hi David, is the red Lexus FCT0023JB yours? It\'s blocking my gate a little.', 60],
+            [$david, 'Sorry Victor, moving it now.', 64],
+            [$neighbours['A7'], 'No problem, thank you!', 66],
+        ] as [$sender, $body, $minutes]) {
+            $chat->messages()->create(['user_id' => $sender->id, 'body' => $body])
+                ->forceFill(['created_at' => $start->copy()->addMinutes($minutes), 'updated_at' => $start->copy()->addMinutes($minutes)])
+                ->save();
+        }
+    }
+
+    /**
+     * @return array<string, User>
+     */
+    private function seedMap(User $david): array
     {
         $neighbours = [
             'A2' => User::factory()->create(['name' => 'Mr. Esele Andrew', 'resident_code' => 'EHN102']),
@@ -136,5 +175,7 @@ class DemoEstateSeeder extends Seeder
         ] as [$code, $label, $kind, $x, $y, $w, $h, $description]) {
             Plot::create(compact('code', 'label', 'kind', 'x', 'y', 'w', 'h', 'description'));
         }
+
+        return $neighbours;
     }
 }

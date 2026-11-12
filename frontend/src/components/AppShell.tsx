@@ -15,8 +15,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, auth, isMockMode } from "@/lib/api";
+import { usePolling } from "@/lib/use-polling";
+import { BADGE_POLL_MS, UNREAD_CHANGED_EVENT } from "./chat";
 import { EmergencyButton } from "./EmergencyButton";
 import { Avatar, cx } from "./ui";
 
@@ -24,7 +26,7 @@ const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/finance", label: "Finance", icon: Banknote },
   { href: "/store", label: "Store", icon: Store },
-  { href: "/messages", label: "Messages", icon: Mail, badge: 6 },
+  { href: "/messages", label: "Messages", icon: Mail },
   { href: "/profile", label: "Profile", icon: UserRound },
   { href: "/activity", label: "Activity", icon: Activity },
   { href: "/estate-map", label: "Estate Map", icon: MapIcon },
@@ -64,6 +66,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isMockMode && !auth.getToken()) router.replace("/login");
   }, [router]);
+
+  // Unread messages badge on the Messages link
+  const [unread, setUnread] = useState(0);
+  const refreshUnread = useCallback(() => {
+    if (!isMockMode && !auth.getToken()) return;
+    api.getUnreadCount().then(setUnread).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    refreshUnread();
+    window.addEventListener(UNREAD_CHANGED_EVENT, refreshUnread);
+    return () => window.removeEventListener(UNREAD_CHANGED_EVENT, refreshUnread);
+  }, [refreshUnread]);
+  usePolling(refreshUnread, BADGE_POLL_MS);
+  const badges: Record<string, number> = { "/messages": unread };
 
   const logout = async () => {
     await api.logout();
@@ -128,8 +144,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Logo />
           </div>
           <nav className="space-y-4" aria-label="Main">
-            {NAV.map(({ href, label, icon: Icon, badge }) => {
+            {NAV.map(({ href, label, icon: Icon }) => {
               const active = section === href;
+              const badge = badges[href] ?? 0;
               return (
                 <Link
                   key={href}
@@ -142,8 +159,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 >
                   <span className="relative">
                     <Icon size={26} />
-                    {badge && (
-                      <span className="absolute -right-2 -top-1.5 rounded-full bg-danger px-1 text-[9px] leading-3.5">{badge}</span>
+                    {badge > 0 && (
+                      <span className="absolute -right-2 -top-1.5 rounded-full bg-danger px-1 text-[9px] leading-3.5">
+                        <span className="sr-only">, unread: </span>
+                        {badge > 99 ? "99+" : badge}
+                      </span>
                     )}
                   </span>
                   {label}

@@ -5,6 +5,7 @@ import { View, type ColorValue } from "react-native";
 import { EmergencyButton } from "@/components/EmergencyButton";
 import { Logo } from "@/components/Logo";
 import { colors, fonts } from "@/components/theme";
+import { useUnread } from "@/lib/unread";
 
 type IconName = ComponentProps<typeof Feather>["name"];
 
@@ -13,6 +14,7 @@ const icon =
   ({ color, size }: { color: ColorValue; size: number }) => <Feather name={name} color={color as string} size={size} />;
 
 export default function TabsLayout() {
+  const unread = useUnread();
   return (
     <Tabs
       screenOptions={{
@@ -42,7 +44,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="activity" options={{ title: "Activity", tabBarIcon: icon("activity") }} />
       <Tabs.Screen name="estate-map" options={{ title: "Estate Map", tabBarLabel: "Map", tabBarIcon: icon("map") }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: icon("user") }} />
-      <Tabs.Screen name="more" options={{ title: "More", tabBarIcon: icon("grid"), tabBarBadge: 6 }} />
+      <Tabs.Screen name="more" options={{ title: "More", tabBarIcon: icon("grid"), tabBarBadge: unread.count > 0 ? (unread.count > 99 ? "99+" : unread.count) : undefined }} />
     </Tabs>
   );
 }

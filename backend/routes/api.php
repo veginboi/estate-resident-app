@@ -3,9 +3,12 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EstateMapController;
 use App\Http\Controllers\Api\Resident\ActivityController;
+use App\Http\Controllers\Api\Resident\ConversationController;
 use App\Http\Controllers\Api\Resident\DashboardController;
 use App\Http\Controllers\Api\Resident\EmergencyAlertController;
 use App\Http\Controllers\Api\Resident\FamilyMemberController;
+use App\Http\Controllers\Api\Resident\MessageController;
+use App\Http\Controllers\Api\Resident\NeighbourController;
 use App\Http\Controllers\Api\Resident\PasswordController;
 use App\Http\Controllers\Api\Resident\ProfileController;
 use App\Http\Controllers\Api\Resident\PropertyController;
@@ -38,6 +41,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/password', [PasswordController::class, 'update']);
 
         Route::post('/emergency-alerts', [EmergencyAlertController::class, 'store'])->middleware('throttle:5,1');
+
+        // Messages: the estate chatroom and one-to-one chats between residents
+        Route::get('/conversations', [ConversationController::class, 'index']);
+        Route::post('/conversations', [ConversationController::class, 'store']);
+        Route::get('/conversations/unread', [ConversationController::class, 'unread']);
+        Route::get('/conversations/{conversation}', [ConversationController::class, 'show'])->whereNumber('conversation');
+        Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index'])->whereNumber('conversation');
+        Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])
+            ->whereNumber('conversation')
+            ->middleware('throttle:30,1');
+        Route::get('/neighbours', NeighbourController::class);
     });
 
     Route::get('/estate/map', EstateMapController::class);

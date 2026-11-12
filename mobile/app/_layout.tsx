@@ -9,6 +9,7 @@ import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { colors, fonts } from "@/components/theme";
 import { SessionProvider, useSession } from "@/lib/session";
+import { UnreadProvider } from "@/lib/unread";
 
 function Splash() {
   return (
@@ -34,6 +35,9 @@ function RootStack() {
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="section/[name]" options={{ title: "" }} />
+        <Stack.Screen name="messages/index" options={{ title: "Messages" }} />
+        <Stack.Screen name="messages/[id]" options={{ title: "" }} />
+        <Stack.Screen name="messages/new" options={{ title: "New chat", presentation: "modal" }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -49,7 +53,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <SessionProvider>{fontsLoaded || fontError ? <RootStack /> : <Splash />}</SessionProvider>
+      <SessionProvider>
+        <UnreadProvider>{fontsLoaded || fontError ? <RootStack /> : <Splash />}</UnreadProvider>
+      </SessionProvider>
     </SafeAreaProvider>
   );
 }

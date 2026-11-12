@@ -25,9 +25,12 @@ The project has three parts that share one API:
 - **Properties**: register and manage your vehicles and other property
 - **Activity**: family gate check-ins and check-outs, which you can filter by day
 - **Estate map**: an interactive map of plots and roads in the estate
+- **Messages**: an estate chatroom for all residents, plus one-to-one chats with neighbours.
+  New messages arrive within a few seconds, and an unread badge shows on the Messages link.
+  Residents who turn off "All Members Can Chat With Me" can't be messaged directly.
 - **Settings**: SMS and email notifications, chat preferences and password change
 
-Finance, Store and Messages are placeholders for now.
+Finance and Store are placeholders for now.
 
 ## Project structure
 
@@ -126,11 +129,22 @@ All endpoints are under `/api`. Every endpoint except sign-up and login needs an
 | GET / PUT | `/resident/settings` | `{smsNotifications, emailNotifications, allowChat}` |
 | PUT | `/resident/password` | `{current_password, password, password_confirmation}` |
 | POST | `/resident/emergency-alerts` | Send an emergency alert |
+| GET | `/resident/conversations` | The estate chatroom, then one-to-one chats, with last message and unread count |
+| POST | `/resident/conversations` | `{residentId}`, open (or start) a one-to-one chat |
+| GET | `/resident/conversations/unread` | `{count}`, total unread messages |
+| GET | `/resident/conversations/{id}` | One chat |
+| GET | `/resident/conversations/{id}/messages` | Latest 50 messages (marks them read). `?after={id}` for newer, `?before={id}` for older |
+| POST | `/resident/conversations/{id}/messages` | `{body}`, send a message (max 2000 characters) |
+| GET | `/resident/neighbours?q=` | Residents who accept messages (name, resident code, plot only) |
 | GET | `/estate/map` | Plots and roads for the estate map |
 
 Responses use Laravel API Resources, wrapped in `{ "data": ... }`, with camelCase fields. The
-TypeScript shapes are in `frontend/src/lib/types.ts`. Sign-up, login and emergency alerts are
-rate-limited.
+TypeScript shapes are in `frontend/src/lib/types.ts`. Sign-up, login, emergency alerts and
+sending messages are rate-limited.
+
+The apps check for new messages every 4 seconds while a chat is open, every 10 seconds on the
+chat list, and every 30 seconds for the unread badge. They stop checking while the tab or app is
+in the background.
 
 Gate activity, estate updates, payments and map plots are read-only in this app. The admin and
 security parts of the system write them.

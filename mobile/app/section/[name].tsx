@@ -4,12 +4,11 @@ import { View } from "react-native";
 import { colors } from "@/components/theme";
 import { Card, Screen, Txt } from "@/components/ui";
 
-// Finance, Store and Messages aren't part of the current Resident App tasks.
+// Finance and Store aren't part of the current Resident App tasks.
 // This placeholder keeps their links working until they're built.
-const SECTIONS: Record<string, { title: string; icon: "credit-card" | "shopping-bag" | "mail" }> = {
+const SECTIONS: Record<string, { title: string; icon: "credit-card" | "shopping-bag" }> = {
   finance: { title: "Finance", icon: "credit-card" },
   store: { title: "Store", icon: "shopping-bag" },
-  messages: { title: "Messages", icon: "mail" },
 };
 
 export default function ComingSoonScreen() {
